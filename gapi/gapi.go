@@ -1,12 +1,11 @@
-package google
+package gapi
 
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"io"
 	"log"
-	"net/http"
-	"os"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -15,20 +14,10 @@ import (
 
 var googleScopes = []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
 
-func mustGetEnv(key string) string {
-	if v, ok := os.LookupEnv(key); !ok {
-		panic(fmt.Sprintf("Variable %s is not set", key))
-	} else if v == "" {
-		panic(fmt.Sprintf("Variable %s is blank", key))
-	} else {
-		return v
-	}
-}
-
-func getClientFromEnvVars(scopes ...string) (*http.Client, error) {
+func getClientFromEnvVars(email string, privateKey string, scopes ...string) (*http.Client, error) {
 	conf := &jwt.Config{
-		Email:      mustGetEnv("SERVICE_ACCOUNT_EMAIL"),
-		PrivateKey: []byte(mustGetEnv("SERVICE_ACCOUNT_PRIVATE_KEY")),
+		Email:      email,
+		PrivateKey: []byte(privateKey),
 		Scopes:     scopes,
 		TokenURL:   google.JWTTokenURL,
 	}
@@ -43,8 +32,8 @@ func jsonDecode(body io.ReadCloser) map[string]interface{} {
 }
 
 //GetDoc is a test func to get doc
-func GetDoc() {
-	client, err := getClientFromEnvVars(googleScopes...)
+func getDoc(email string, privateKey string) {
+	client, err := getClientFromEnvVars(email, privateKey, googleScopes...)
 	if err != nil {
 		log.Fatal(err)
 	}

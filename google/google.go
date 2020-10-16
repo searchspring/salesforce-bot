@@ -1,36 +1,38 @@
-package main
+package google
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/jwt"
 )
 
-var scopes = []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
+var googleScopes = []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
 
-func getClientFromCredentialsJSON(filename string, scopes ...string) (*http.Client, error) {
-	b, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
+func mustGetEnv(key string) string {
+	if v, ok := os.LookupEnv(key); !ok {
+		panic(fmt.Sprintf("Variable %s is not set", key))
+	} else if v == "" {
+		panic(fmt.Sprintf("Variable %s is blank", key))
+	} else {
+		return v
 	}
+}
 
-	creds, err := google.CredentialsFromJSON(context.Background(), b, scopes...)
-	if err != nil {
-		return nil, err
+func getClientFromEnvVars(scopes ...string) (*http.Client, error) {
+	conf := &jwt.Config{
+		Email:      mustGetEnv("SERVICE_ACCOUNT_EMAIL"),
+		PrivateKey: []byte(mustGetEnv("SERVICE_ACCOUNT_PRIVATE_KEY")),
+		Scopes:     scopes,
+		TokenURL:   google.JWTTokenURL,
 	}
-
-	client := oauth2.NewClient(context.Background(), creds.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-
+	client := conf.Client(oauth2.NoContext)
 	return client, nil
 }
 
@@ -40,8 +42,9 @@ func jsonDecode(body io.ReadCloser) map[string]interface{} {
 	return data
 }
 
-func main() {
-	client, err := getClientFromCredentialsJSON("nebo.json", scopes...)
+//GetDoc is a test func to get doc
+func GetDoc() {
+	client, err := getClientFromEnvVars(googleScopes...)
 	if err != nil {
 		log.Fatal(err)
 	}

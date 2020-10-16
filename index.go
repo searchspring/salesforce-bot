@@ -11,6 +11,7 @@ import (
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/nlopes/slack"
+	"searchspring.com/slack/google"
 	"searchspring.com/slack/nextopia"
 	"searchspring.com/slack/salesforce"
 )
@@ -206,6 +207,7 @@ func getMeetLink(search string) string {
 }
 
 func fireResponse() []byte {
+	google.GetDoc()
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
 		Text: "1. Create Fire document - https://docs.google.com/document/create?usp=drive_web&ouid=117735186481765666461&folder=1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht\n" +

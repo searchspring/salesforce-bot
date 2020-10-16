@@ -1,4 +1,10 @@
-.now
 .env
-credentials.json
-nebo.json
+
+.now
+.vercel
+
+.idea
+.vscode
+
+package-lock.json
+node_modules

@@ -259,7 +259,6 @@ func fireResponse(gcpEmail string, gcpPrivateKey string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	client.CloseIdleConnections()
 
 	err = gapi.AssignParentFolder(client, documentID)
 	if err != nil {

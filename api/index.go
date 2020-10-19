@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -84,11 +85,21 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case "/fire":
-		res.Write(fireResponse(gcpEmail, gcpPrivateKey))
+		body, err := fireResponse(gcpEmail, gcpPrivateKey)
+		if err != nil {
+			log.Println(err)
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+		}
+		res.Write(body)
 		return
 
 	case "/firetest":
-		res.Write(fireResponse(gcpEmail, gcpPrivateKey))
+		body, err := fireResponse(gcpEmail, gcpPrivateKey)
+		if err != nil {
+			log.Println(err)
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+		}
+		res.Write(body)
 		return
 
 	case "/firedown":
@@ -242,21 +253,30 @@ func getMeetLink(search string) string {
 	return "g.co/meet/" + name
 }
 
-func fireResponse(gcpEmail string, gcpPrivateKey string) []byte {
-	gapi.CreateFireDoc(gcpEmail, gcpPrivateKey)
+func fireResponse(gcpEmail string, gcpPrivateKey string) ([]byte, error) {
+	client := gapi.GetGoogleAPIClient(gcpEmail, gcpPrivateKey, gapi.Scopes...)
+	documentID, err := gapi.CreateFireDoc(client)
+	if err != nil {
+		return nil, err
+	}
+	client.CloseIdleConnections()
+
+	err = gapi.AssignParentFolder(client, documentID)
+	if err != nil {
+		return nil, err
+	}
+
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
-		Text: "1. Create Fire document - https://docs.google.com/document/create?usp=drive_web&ouid=117735186481765666461&folder=1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht\n" +
-			"2. Designate Fire Leader\n" +
+		Text: "...\n1. Designate Fire Leader\n" +
+			"2. Designate Document Maintainer - https://docs.google.com/document/d/" + documentID + "/edit\n" +
 			"3. If a real fire - make an announcement in the annoucements channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
 			"4. Post a link to the fire document in the announcement channel thread\n" +
-			"5. Designate helper(s) to update document\n" +
-			"6. Designate helper(s) to update announcement\n" +
-			"7. Fight!\n" +
-			getMeetLink(""),
+			"5. Designate helper(s) to update announcement\n" +
+			"6. Fight!\n" + getMeetLink(""),
 	}
 	json, _ := json.Marshal(msg)
-	return json
+	return json, nil
 }
 
 func fireDownResponse() []byte {

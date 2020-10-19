@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -15,9 +14,13 @@ import (
 	"golang.org/x/oauth2/jwt"
 )
 
-var googleScopes = []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
+var fireDocFolderID = "19p5T5iTuouXMMaHoVdmbZdDjD8EshRxq"
 
-func getClientFromEnvVars(email string, privateKey string, scopes ...string) (*http.Client, error) {
+// Scopes is the Google API scopes list
+var Scopes = []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
+
+// GetGoogleAPIClient returns a Google API authenticated HTTP client
+func GetGoogleAPIClient(email string, privateKey string, scopes ...string) *http.Client {
 	conf := &jwt.Config{
 		Email:      email,
 		PrivateKey: []byte(privateKey),
@@ -25,7 +28,7 @@ func getClientFromEnvVars(email string, privateKey string, scopes ...string) (*h
 		TokenURL:   google.JWTTokenURL,
 	}
 	client := conf.Client(oauth2.NoContext)
-	return client, nil
+	return client
 }
 
 func jsonDecode(body io.ReadCloser) map[string]interface{} {
@@ -34,79 +37,54 @@ func jsonDecode(body io.ReadCloser) map[string]interface{} {
 	return data
 }
 
-//CreateFireDoc creates a fire document in the provided Google Drive folder
-func CreateFireDoc(email string, privateKey string) {
-	client, err := getClientFromEnvVars(email, privateKey, googleScopes...)
+// CreateFireDoc creates a fire document and returns the document ID
+func CreateFireDoc(client *http.Client) (string, error) {
+	now := time.Now().Format(time.RFC3339)
+	requestBody, err := json.Marshal(map[string]interface{}{"title": fmt.Sprintf("%s Fire Title", now)})
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	requestBody, err := json.Marshal(map[string]interface{}{
-		"title": fmt.Sprintf("%s Fire Title", time.Now().Format(time.RFC3339)),
-	})
-
-	if err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
 
 	resp, err := client.Post("https://docs.googleapis.com/v1/documents", "application/json", bytes.NewBuffer(requestBody))
-
 	if err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
-
 	defer resp.Body.Close()
 
-	// body, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	documentID, found := jsonDecode(resp.Body)["documentId"]
-
 	if !found {
-		log.Fatalln(err)
+		return "", err
 	}
 
 	documentIDString, ok := documentID.(string)
-
 	if !ok {
-		log.Fatalln(err)
+		return "", err
 	}
 
-	AssignParentFolder(email, privateKey, documentIDString)
+	return documentIDString, nil
 }
 
-//AssignParentFolder assigns the document to the Current Fires folder
-func AssignParentFolder(email string, privateKey string, fileID string) {
-	client, err := getClientFromEnvVars(email, privateKey, googleScopes...)
+// AssignParentFolder assigns the document to the Current Fires folder
+func AssignParentFolder(client *http.Client, fileID string) error {
+	// "id": "1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht", post mortem / current fires folder
+	requestBody, err := json.Marshal(map[string]interface{}{"id": fireDocFolderID})
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	requestBody, err := json.Marshal(map[string]interface{}{
-		// "id": "1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht", post mortem / current fires folder
-		"id": "19p5T5iTuouXMMaHoVdmbZdDjD8EshRxq",
-	})
-
-	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
 	resp, err := client.Post(fmt.Sprintf("https://www.googleapis.com/drive/v2/files/%s/parents", fileID), "application/json", bytes.NewBuffer(requestBody))
-
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
-
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
-
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
-	fmt.Println(string(body))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Error moving document %s to folder %s:\n%s", fileID, fireDocFolderID, body)
+	}
+	return nil
 }

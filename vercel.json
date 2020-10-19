@@ -1,21 +1,21 @@
 {
-    "version": 2,
-    "env": {
-      "SF_URL": "@sf-url",
-      "SF_USER":"@sf-user",
-      "SF_PASSWORD":"@sf-password",
-      "SF_TOKEN":"@sf-token",
-      "SLACK_VERIFICATION_TOKEN":"@slack-verification-token",
-      "SLACK_OAUTH_TOKEN":"@slack-oauth-token",
-      "NX_USER":"@nx-user",
-      "NX_PASSWORD":"@nx-password",
-      "GCP_SERVICE_ACCOUNT_EMAIL": "@gcp-service-account-email",
-      "GCP_SERVICE_ACCOUNT_PRIVATE_KEY": "@gcp-service-account-private-key"
-    },
-    "builds": [
-      {
-        "src": "index.go",
-        "use": "@vercel/go"
-      }
-    ]
-  }
+  "version": 2,
+  "env": {
+    "SF_URL": "@sf-url",
+    "SF_USER": "@sf-user",
+    "SF_PASSWORD": "@sf-password",
+    "SF_TOKEN": "@sf-token",
+    "SLACK_VERIFICATION_TOKEN": "@slack-verification-token",
+    "SLACK_OAUTH_TOKEN": "@slack-oauth-token",
+    "NX_USER": "@nx-user",
+    "NX_PASSWORD": "@nx-password",
+    "GCP_SERVICE_ACCOUNT_EMAIL": "@gcp-service-account-email",
+    "GCP_SERVICE_ACCOUNT_PRIVATE_KEY": "@gcp-service-account-private-key"
+  },
+  "builds": [
+    {
+      "src": "api/index.go",
+      "use": "@vercel/go"
+    }
+  ]
+}

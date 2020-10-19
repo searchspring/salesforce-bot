@@ -1,11 +1,14 @@
 package gapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"io"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -31,20 +34,79 @@ func jsonDecode(body io.ReadCloser) map[string]interface{} {
 	return data
 }
 
-//GetDoc is a test func to get doc
-func getDoc(email string, privateKey string) {
+//CreateFireDoc creates a fire document in the provided Google Drive folder
+func CreateFireDoc(email string, privateKey string) {
 	client, err := getClientFromEnvVars(email, privateKey, googleScopes...)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// TODO - Instead of GET, figure out how to POST a new doc that uses desired format in desired location
-	// Google Doc Create: https://developers.google.com/docs/api/reference/rest/v1/documents/create
-	// Should be created here: https://drive.google.com/drive/folders/1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht
-	resp, err := client.Get("https://docs.googleapis.com/v1/documents/1vb1gofwabN4Mml-li4O9R82VwD3DPHSQ5NAgs1md6Ik")
+	requestBody, err := json.Marshal(map[string]interface{}{
+		"title": fmt.Sprintf("%s Fire Title", time.Now().Format(time.RFC3339)),
+	})
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	resp, err := client.Post("https://docs.googleapis.com/v1/documents", "application/json", bytes.NewBuffer(requestBody))
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	defer resp.Body.Close()
+
+	// body, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	documentID, found := jsonDecode(resp.Body)["documentId"]
+
+	if !found {
+		log.Fatalln(err)
+	}
+
+	documentIDString, ok := documentID.(string)
+
+	if !ok {
+		log.Fatalln(err)
+	}
+
+	AssignParentFolder(email, privateKey, documentIDString)
+}
+
+//AssignParentFolder assigns the document to the Current Fires folder
+func AssignParentFolder(email string, privateKey string, fileID string) {
+	client, err := getClientFromEnvVars(email, privateKey, googleScopes...)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(jsonDecode(resp.Body))
+	requestBody, err := json.Marshal(map[string]interface{}{
+		// "id": "1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht", post mortem / current fires folder
+		"id": "19p5T5iTuouXMMaHoVdmbZdDjD8EshRxq",
+	})
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	resp, err := client.Post(fmt.Sprintf("https://www.googleapis.com/drive/v2/files/%s/parents", fileID), "application/json", bytes.NewBuffer(requestBody))
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println(string(body))
 }

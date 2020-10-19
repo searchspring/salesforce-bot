@@ -33,7 +33,7 @@ func containsEmptyString(vars ...string) bool {
 func Handler(res http.ResponseWriter, req *http.Request) {
 	slackVerificationCode := mustGetEnv("SLACK_VERIFICATION_TOKEN")
 	slackOauthToken := mustGetEnv("SLACK_OAUTH_TOKEN")
-	sfURL, sfUser, sfPassword, sfToken, nxUser, nxPassword, gcpEmail, gcpPrivateKey := getEnvironmentValues()
+	sfURL, sfUser, sfPassword, sfToken, nxUser, nxPassword, gcpEmail, gcpPrivateKey, fireDocFolderID := getEnvironmentValues()
 
 	s, err := slack.SlashCommandParse(req)
 	if err != nil {
@@ -85,20 +85,22 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case "/fire":
-		body, err := fireResponse(gcpEmail, gcpPrivateKey)
+		body, err := fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID)
 		if err != nil {
 			log.Println(err)
 			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		res.Write(body)
 		return
 
 	case "/firetest":
-		body, err := fireResponse(gcpEmail, gcpPrivateKey)
-		if err != nil {
-			log.Println(err)
-			http.Error(res, err.Error(), http.StatusInternalServerError)
-		}
+		body, _ := fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID)
+		// if err != nil {
+		// 	log.Println(err)
+		// 	http.Error(res, err.Error(), http.StatusInternalServerError)
+		// 	return
+		// }
 		res.Write(body)
 		return
 
@@ -253,14 +255,19 @@ func getMeetLink(search string) string {
 	return "g.co/meet/" + name
 }
 
-func fireResponse(gcpEmail string, gcpPrivateKey string) ([]byte, error) {
+func fireResponse(gcpEmail string, gcpPrivateKey string, fireDocFolderID string) ([]byte, error) {
 	client := gapi.GetGoogleAPIClient(gcpEmail, gcpPrivateKey, gapi.Scopes...)
 	documentID, err := gapi.CreateFireDoc(client)
 	if err != nil {
 		return nil, err
 	}
 
-	err = gapi.AssignParentFolder(client, documentID)
+	err = gapi.WriteDoc(client, documentID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = gapi.AssignParentFolder(client, documentID, fireDocFolderID)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +306,7 @@ func mustGetEnv(key string) string {
 	}
 }
 
-func getEnvironmentValues() (string, string, string, string, string, string, string, string) {
+func getEnvironmentValues() (string, string, string, string, string, string, string, string, string) {
 	return os.Getenv("SF_URL"),
 		os.Getenv("SF_USER"),
 		os.Getenv("SF_PASSWORD"),
@@ -307,5 +314,6 @@ func getEnvironmentValues() (string, string, string, string, string, string, str
 		os.Getenv("NX_USER"),
 		os.Getenv("NX_PASSWORD"),
 		os.Getenv("GCP_SERVICE_ACCOUNT_EMAIL"),
-		os.Getenv("GCP_SERVICE_ACCOUNT_PRIVATE_KEY")
+		os.Getenv("GCP_SERVICE_ACCOUNT_PRIVATE_KEY"),
+		os.Getenv("GDRIVE_FIRE_DOC_FOLDER_ID")
 }

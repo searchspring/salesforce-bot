@@ -14,8 +14,6 @@ import (
 	"golang.org/x/oauth2/jwt"
 )
 
-var fireDocFolderID = "19p5T5iTuouXMMaHoVdmbZdDjD8EshRxq"
-
 // Scopes is the Google API scopes list
 var Scopes = []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
 
@@ -40,7 +38,7 @@ func jsonDecode(body io.ReadCloser) map[string]interface{} {
 // CreateFireDoc creates a fire document and returns the document ID
 func CreateFireDoc(client *http.Client) (string, error) {
 	now := time.Now().Format(time.RFC3339)
-	requestBody, err := json.Marshal(map[string]interface{}{"title": fmt.Sprintf("%s Fire Title", now)})
+	requestBody, err := json.Marshal(map[string]string{"title": fmt.Sprintf("%s Fire Title", now)})
 	if err != nil {
 		return "", err
 	}
@@ -64,15 +62,14 @@ func CreateFireDoc(client *http.Client) (string, error) {
 	return documentIDString, nil
 }
 
-// AssignParentFolder assigns the document to the Current Fires folder
-func AssignParentFolder(client *http.Client, fileID string) error {
-	// "id": "1CgRBFg2CTbvjLp57yfoUOD_OZlaVxOht", post mortem / current fires folder
-	requestBody, err := json.Marshal(map[string]interface{}{"id": fireDocFolderID})
+// AssignParentFolder assigns the document's parent to the provided folder
+func AssignParentFolder(client *http.Client, documentID string, fireDocFolderID string) error {
+	requestBody, err := json.Marshal(map[string]string{"id": fireDocFolderID})
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Post(fmt.Sprintf("https://www.googleapis.com/drive/v2/files/%s/parents", fileID), "application/json", bytes.NewBuffer(requestBody))
+	resp, err := client.Post(fmt.Sprintf("https://www.googleapis.com/drive/v2/files/%s/parents", documentID), "application/json", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return err
 	}
@@ -84,7 +81,37 @@ func AssignParentFolder(client *http.Client, fileID string) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Error moving document %s to folder %s:\n%s", fileID, fireDocFolderID, body)
+		return fmt.Errorf("Error moving document %s to folder %s:\n%s", documentID, fireDocFolderID, body)
+	}
+	return nil
+}
+
+// WriteDoc writes initial content to the fire doc
+func WriteDoc(client *http.Client, documentID string) error {
+	zone, offset := time.Now().Zone()
+	//location := map[string]interface{}{"segmentId": "", "index": 1}
+	endLocation := map[string]interface{}{"segmentId": ""}
+	fireDocContent := map[string]interface{}{"text": fmt.Sprintf("Timeline %s %v", zone, offset), "endOfSegmentLocation": endLocation}
+	insertText := map[string]interface{}{"insertText": fireDocContent}
+	requests := map[string][]interface{}{"requests": {insertText}}
+	requestBody, err := json.Marshal(requests)
+	if err != nil {
+		return err
+	}
+
+	resp, err := client.Post(fmt.Sprintf("https://docs.googleapis.com/v1/documents/%s:batchUpdate", documentID), "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Error writing to document %s:\n%s", documentID, body)
 	}
 	return nil
 }

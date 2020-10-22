@@ -3,9 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -21,6 +19,7 @@ import (
 
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
+var gapiDAO gapi.DAO = nil
 
 func containsEmptyString(vars ...string) bool {
 	for _, v := range vars {
@@ -35,7 +34,7 @@ func containsEmptyString(vars ...string) bool {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	slackVerificationCode := mustGetEnv("SLACK_VERIFICATION_TOKEN")
 	slackOauthToken := mustGetEnv("SLACK_OAUTH_TOKEN")
-	sfURL, sfUser, sfPassword, sfToken, nxUser, nxPassword, gcpEmail, gcpPrivateKey, fireDocFolderID := getEnvironmentValues()
+	sfURL, sfUser, sfPassword, sfToken, nxUser, nxPassword, gapiEmail, gapiPrivateKey, fireDocFolderID := getEnvironmentValues()
 
 	s, err := slack.SlashCommandParse(r)
 	if err != nil {
@@ -65,6 +64,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		nextopiaDAO = nextopia.NewDAO(nxUser, nxPassword)
 	}
 
+	gapiVars := []string{gapiEmail, gapiPrivateKey, fireDocFolderID}
+	if gapiDAO == nil && !containsEmptyString(gapiVars...) {
+		gapiDAO = gapi.NewDAO(gapiEmail, gapiPrivateKey, fireDocFolderID)
+	}
+
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
 	case "/rep", "/alpha-nebo", "/nebo":
@@ -87,8 +91,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "/fire":
+	case "/firetest":
 		if strings.TrimSpace(s.Text) == "help" {
 			writeHelpFire(w)
+			return
+		}
+		if gapiDAO == nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Missing required Google API credentials."))
 			return
 		}
 		// We only have 3 seconds to initially respond
@@ -97,17 +107,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		// that slack will drop our connection before we finish doing everything and responding
 		fireTitle := cleanFireTitle(s.Text)
 		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
-		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)
-		return
-
-	case "/firetest":
-		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpFire(w)
-			return
-		}
-		fireTitle := cleanFireTitle(s.Text)
-		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
-		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)
+		go fireResponse(gapiDAO, fireDocFolderID, fireTitle, s.ResponseURL)
 		return
 
 	case "/firedown":
@@ -270,11 +270,11 @@ func getMeetLink(search string) string {
 	return "g.co/meet/" + name
 }
 
-func fireResponse(gcpEmail string, gcpPrivateKey string, fireDocFolderID string, title string, responseURL string) {
-	documentID, err := generateFireDoc(gcpEmail, gcpPrivateKey, fireDocFolderID, title)
+func fireResponse(d gapi.DAO, folderID string, title string, responseURL string) {
+	documentID, err := d.GenerateFireDoc(title)
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
-		Text:         fireChecklist(documentID, title, fireDocFolderID, err),
+		Text:         fireChecklist(folderID, documentID, title, err),
 	}
 	json, _ := json.Marshal(msg)
 	http.Post(responseURL, "application/json", bytes.NewBuffer(json))
@@ -288,31 +288,7 @@ func cleanFireTitle(title string) string {
 	return title
 }
 
-func generateFireDoc(gcpEmail string, gcpPrivateKey string, fireDocFolderID string, title string) (string, error) {
-	client := gapi.GetGoogleAPIClient(gcpEmail, gcpPrivateKey, gapi.Scopes...)
-
-	documentID, err := gapi.CreateFireDoc(client, title)
-	if err != nil {
-		log.Println(err)
-		return "", errors.New("Error creating fire doc")
-	}
-
-	err = gapi.AssignParentFolder(client, documentID, fireDocFolderID)
-	if err != nil {
-		log.Println(err)
-		return "", errors.New("Unable to move fire doc into correct folder in GDrive")
-	}
-
-	err = gapi.WriteDoc(client, documentID)
-	if err != nil {
-		log.Println(err)
-		// In this case we can still use the created doc so there is an error and a documentID returned
-		return documentID, errors.New("Unable to write default content to fire doc")
-	}
-	return documentID, nil
-}
-
-func fireChecklist(documentID string, title string, fireDocFolderID string, err error) string {
+func fireChecklist(fireDocFolderID string, documentID string, title string, err error) string {
 	fireDocLink := fmt.Sprintf("<https://docs.google.com/document/d/%s/edit|%s>", documentID, title)
 	if documentID == "" {
 		fireDocLink = fmt.Sprintf("Create new fire doc <https://drive.google.com/drive/folders/%s|here>", fireDocFolderID)

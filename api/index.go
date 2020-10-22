@@ -105,10 +105,6 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 			writeHelpFire(res)
 			return
 		}
-		// We only have 3 seconds to initially respond
-		// https://api.slack.com/interactivity/slash-commands#responding_to_commands
-		// So we ACK before doing our work because Google APIs can be slow enough
-		// that slack will drop our connection before we finish doing everything and responding
 		fireTitle := cleanFireTitle(s.Text)
 		res.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
 		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)

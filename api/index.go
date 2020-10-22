@@ -32,21 +32,21 @@ func containsEmptyString(vars ...string) bool {
 }
 
 // Handler - check routing and call correct methods
-func Handler(res http.ResponseWriter, req *http.Request) {
+func Handler(w http.ResponseWriter, r *http.Request) {
 	slackVerificationCode := mustGetEnv("SLACK_VERIFICATION_TOKEN")
 	slackOauthToken := mustGetEnv("SLACK_OAUTH_TOKEN")
 	sfURL, sfUser, sfPassword, sfToken, nxUser, nxPassword, gcpEmail, gcpPrivateKey, fireDocFolderID := getEnvironmentValues()
 
-	s, err := slack.SlashCommandParse(req)
+	s, err := slack.SlashCommandParse(r)
 	if err != nil {
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
 		return
 	}
 
 	if !s.ValidateToken(slackVerificationCode) {
-		res.WriteHeader(http.StatusUnauthorized)
-		res.Write([]byte("slack verification failed"))
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("slack verification failed"))
 		return
 	}
 
@@ -54,8 +54,8 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 	if salesForceDAO == nil && !containsEmptyString(salesForceVars...) {
 		salesForceDAO, err = salesforce.NewDAO(sfURL, sfUser, sfPassword, sfToken)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte("salesforce client was not created successfully: " + err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("salesforce client was not created successfully: " + err.Error()))
 			return
 		}
 	}
@@ -65,30 +65,30 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		nextopiaDAO = nextopia.NewDAO(nxUser, nxPassword)
 	}
 
-	res.Header().Set("Content-type", "application/json")
+	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
 	case "/rep", "/alpha-nebo", "/nebo":
 		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
-			writeHelpNebo(res)
+			writeHelpNebo(w)
 			return
 		}
 		if salesForceDAO == nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte("Missing required Salesforce credentials."))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Missing required Salesforce credentials."))
 			return
 		}
 		responseJSON, err := salesForceDAO.Query(s.Text)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte(err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
 			return
 		}
-		res.Write(responseJSON)
+		w.Write(responseJSON)
 		return
 
 	case "/fire":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpFire(res)
+			writeHelpFire(w)
 			return
 		}
 		// We only have 3 seconds to initially respond
@@ -96,140 +96,140 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		// So we ACK before doing our work because Google APIs can be slow enough
 		// that slack will drop our connection before we finish doing everything and responding
 		fireTitle := cleanFireTitle(s.Text)
-		res.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
+		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
 		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)
 		return
 
 	case "/firetest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpFire(res)
+			writeHelpFire(w)
 			return
 		}
 		fireTitle := cleanFireTitle(s.Text)
-		res.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
+		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
 		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)
 		return
 
 	case "/firedown":
-		res.Write(fireDownResponse())
+		w.Write(fireDownResponse())
 		return
 
 	case "/neboidnx", "/neboid":
 		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
-			writeHelpNeboid(res)
+			writeHelpNeboid(w)
 			return
 		}
 		if nextopiaDAO == nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte("Missing required Nextopia credentials."))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Missing required Nextopia credentials."))
 			return
 		}
 		responseJSON, err := nextopiaDAO.Query(s.Text)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte(err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
 			return
 		}
-		res.Write(responseJSON)
+		w.Write(responseJSON)
 		return
 
 	case "/neboidss":
 		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
-			writeHelpNeboid(res)
+			writeHelpNeboid(w)
 			return
 		}
 		if salesForceDAO == nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte("Missing required Salesforce credentials."))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Missing required Salesforce credentials."))
 			return
 		}
 		responseJSON, err := salesForceDAO.IDQuery(s.Text)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			res.Write([]byte(err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
 			return
 		}
-		res.Write(responseJSON)
+		w.Write(responseJSON)
 		return
 
 	case "/feature":
 		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
-			writeHelpFeature(res)
+			writeHelpFeature(w)
 			return
 		}
 		sendSlackMessage(slackOauthToken, s.Text, s.UserID)
 		responseJSON := featureResponse(s.Text)
-		res.Write(responseJSON)
+		w.Write(responseJSON)
 		return
 
 	case "/meet":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpMeet(res)
+			writeHelpMeet(w)
 			return
 		}
 		responseJSON := meetResponse(s.Text)
-		res.Write(responseJSON)
+		w.Write(responseJSON)
 		return
 
 	case "/meettest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpMeet(res)
+			writeHelpMeet(w)
 			return
 		}
 		responseJSON := meetResponse(s.Text)
-		res.Write(responseJSON)
+		w.Write(responseJSON)
 		return
 
 	default:
-		res.WriteHeader(http.StatusInternalServerError)
-		res.Write([]byte("unknown slash command " + s.Command))
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("unknown slash command " + s.Command))
 		return
 	}
 }
 
-func writeHelpFeature(res http.ResponseWriter) {
+func writeHelpFeature(w http.ResponseWriter) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text:         "Feature usage:\n`/feature description of feature required` - submits a feature to the product team\n`/feature help` - this message",
 	}
 	json, _ := json.Marshal(msg)
-	res.Write(json)
+	w.Write(json)
 }
 
-func writeHelpFire(res http.ResponseWriter) {
+func writeHelpFire(w http.ResponseWriter) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text:         "Fire usage:\n`/fire Fire Title` - start a new fire doc named 'Fire Title' and generate a fire checklist to handle the fire",
 	}
 	json, _ := json.Marshal(msg)
-	res.Write(json)
+	w.Write(json)
 }
 
-func writeHelpNebo(res http.ResponseWriter) {
+func writeHelpNebo(w http.ResponseWriter) {
 	platformsJoined := strings.ToLower(strings.Join(salesforce.Platforms, ", "))
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text:         "Nebo usage:\n`/nebo shoes` - find all customers with shoe in the name\n`/nebo shopify` - show {" + platformsJoined + "} clients sorted by MRR\n`/nebo help` - this message",
 	}
 	json, _ := json.Marshal(msg)
-	res.Write(json)
+	w.Write(json)
 }
-func writeHelpNeboid(res http.ResponseWriter) {
+func writeHelpNeboid(w http.ResponseWriter) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text:         "Neboid usage:\n`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n`/neboid help` - this message",
 	}
 	json, _ := json.Marshal(msg)
-	res.Write(json)
+	w.Write(json)
 }
 
-func writeHelpMeet(res http.ResponseWriter) {
+func writeHelpMeet(w http.ResponseWriter) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text:         "Meet usage:\n`/meet` - generate a random meet\n`/meet name` - generate a meet with a name\n`/meet help` - this message",
 	}
 	json, _ := json.Marshal(msg)
-	res.Write(json)
+	w.Write(json)
 }
 
 func sendSlackMessage(token string, text string, authorID string) {

@@ -87,13 +87,17 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case "/fire":
-		// body, err := fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID)
-		// if err != nil {
-		// 	log.Println(err)
-		// 	http.Error(res, err.Error(), http.StatusInternalServerError)
-		// 	return
-		// }
-		// res.Write(body)
+		if strings.TrimSpace(s.Text) == "help" {
+			writeHelpFire(res)
+			return
+		}
+		// We only have 3 seconds to initially respond
+		// https://api.slack.com/interactivity/slash-commands#responding_to_commands
+		// So we ACK before doing our work because Google APIs can be slow enough
+		// that slack will drop our connection before we finish doing everything and responding
+		fireTitle := cleanFireTitle(s.Text)
+		res.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
+		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)
 		return
 
 	case "/firetest":

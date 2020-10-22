@@ -36,9 +36,9 @@ func jsonDecode(body io.ReadCloser) map[string]interface{} {
 }
 
 // CreateFireDoc creates a fire document and returns the document ID
-func CreateFireDoc(client *http.Client) (string, error) {
+func CreateFireDoc(client *http.Client, title string) (string, error) {
 	now := time.Now().Format(time.RFC3339)
-	requestBody, err := json.Marshal(map[string]string{"title": fmt.Sprintf("%s Fire Title", now)})
+	requestBody, err := json.Marshal(map[string]string{"title": fmt.Sprintf("%s %s", now, title)})
 	if err != nil {
 		return "", err
 	}

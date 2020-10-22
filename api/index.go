@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -85,23 +87,27 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case "/fire":
-		body, err := fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID)
-		if err != nil {
-			log.Println(err)
-			http.Error(res, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		res.Write(body)
-		return
-
-	case "/firetest":
-		body, _ := fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID)
+		// body, err := fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID)
 		// if err != nil {
 		// 	log.Println(err)
 		// 	http.Error(res, err.Error(), http.StatusInternalServerError)
 		// 	return
 		// }
-		res.Write(body)
+		// res.Write(body)
+		return
+
+	case "/firetest":
+		if strings.TrimSpace(s.Text) == "help" {
+			writeHelpFire(res)
+			return
+		}
+		// We only have 3 seconds to initially respond
+		// https://api.slack.com/interactivity/slash-commands#responding_to_commands
+		// So we ACK before doing our work because Google APIs can be slow enough
+		// that slack will drop our connection before we finish doing everything and responding
+		fireTitle := cleanFireTitle(s.Text)
+		res.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
+		go fireResponse(gcpEmail, gcpPrivateKey, fireDocFolderID, fireTitle, s.ResponseURL)
 		return
 
 	case "/firedown":
@@ -190,6 +196,15 @@ func writeHelpFeature(res http.ResponseWriter) {
 	res.Write(json)
 }
 
+func writeHelpFire(res http.ResponseWriter) {
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeEphemeral,
+		Text:         "Fire usage:\n`/fire Fire Title` - start a new fire doc named 'Fire Title' and generate a fire checklist to handle the fire",
+	}
+	json, _ := json.Marshal(msg)
+	res.Write(json)
+}
+
 func writeHelpNebo(res http.ResponseWriter) {
 	platformsJoined := strings.ToLower(strings.Join(salesforce.Platforms, ", "))
 	msg := &slack.Msg{
@@ -255,34 +270,66 @@ func getMeetLink(search string) string {
 	return "g.co/meet/" + name
 }
 
-func fireResponse(gcpEmail string, gcpPrivateKey string, fireDocFolderID string) ([]byte, error) {
-	client := gapi.GetGoogleAPIClient(gcpEmail, gcpPrivateKey, gapi.Scopes...)
-	documentID, err := gapi.CreateFireDoc(client)
-	if err != nil {
-		return nil, err
+func fireResponse(gcpEmail string, gcpPrivateKey string, fireDocFolderID string, title string, responseURL string) {
+	documentID, err := generateFireDoc(gcpEmail, gcpPrivateKey, fireDocFolderID, title)
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeInChannel,
+		Text:         fireChecklist(documentID, title, fireDocFolderID, err),
 	}
+	json, _ := json.Marshal(msg)
+	http.Post(responseURL, "application/json", bytes.NewBuffer(json))
+}
 
-	err = gapi.WriteDoc(client, documentID)
+func cleanFireTitle(title string) string {
+	title = strings.Trim(title, " ")
+	if title == "" {
+		title = "Untitled Fire"
+	}
+	return title
+}
+
+func generateFireDoc(gcpEmail string, gcpPrivateKey string, fireDocFolderID string, title string) (string, error) {
+	client := gapi.GetGoogleAPIClient(gcpEmail, gcpPrivateKey, gapi.Scopes...)
+
+	documentID, err := gapi.CreateFireDoc(client, title)
 	if err != nil {
-		return nil, err
+		log.Println(err)
+		return "", errors.New("Error creating fire doc")
 	}
 
 	err = gapi.AssignParentFolder(client, documentID, fireDocFolderID)
 	if err != nil {
-		return nil, err
+		log.Println(err)
+		return "", errors.New("Unable to move fire doc into correct folder in GDrive")
 	}
 
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeInChannel,
-		Text: "...\n1. Designate Fire Leader\n" +
-			"2. Designate Document Maintainer - https://docs.google.com/document/d/" + documentID + "/edit\n" +
-			"3. If a real fire - make an announcement in the annoucements channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
-			"4. Post a link to the fire document in the announcement channel thread\n" +
-			"5. Designate helper(s) to update announcement\n" +
-			"6. Fight!\n" + getMeetLink(""),
+	err = gapi.WriteDoc(client, documentID)
+	if err != nil {
+		log.Println(err)
+		// In this case we can still use the created doc so there is an error and a documentID returned
+		return documentID, errors.New("Unable to write default content to fire doc")
 	}
-	json, _ := json.Marshal(msg)
-	return json, nil
+	return documentID, nil
+}
+
+func fireChecklist(documentID string, title string, fireDocFolderID string, err error) string {
+	fireDocLink := fmt.Sprintf("<https://docs.google.com/document/d/%s/edit|%s>", documentID, title)
+	if documentID == "" {
+		fireDocLink = fmt.Sprintf("Create new fire doc <https://drive.google.com/drive/folders/%s|here>", fireDocFolderID)
+	}
+	text := "1. Designate Fire Leader\n" +
+		"2. Designate Fire Doc Maintainer: " + fireDocLink + "\n" +
+		"3. If a real fire - make an announcement in the annoucements channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
+		"4. Post a link to the fire document in the announcement channel thread\n" +
+		"5. Designate helper(s) to update announcement\n" +
+		"6. Fight! " + getMeetLink(title) + "\n" +
+		"7. Use `/firedown` when the fire is out"
+
+	if err != nil {
+		text += "\n*Warning* - Encountered error:\n"
+		text += "- " + err.Error()
+	}
+	return text
 }
 
 func fireDownResponse() []byte {

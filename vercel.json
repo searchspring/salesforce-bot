@@ -1,0 +1,19 @@
+{
+    "version": 2,
+    "env": {
+        "SF_URL": "@sf-url",
+        "SF_USER": "@sf-user",
+        "SF_PASSWORD": "@sf-password",
+        "SF_TOKEN": "@sf-token",
+        "SLACK_VERIFICATION_TOKEN": "@slack-verification-token",
+        "SLACK_OAUTH_TOKEN": "@slack-oauth-token",
+        "NX_USER": "@nx-user",
+        "NX_PASSWORD": "@nx-password"
+    },
+    "builds": [
+        {
+            "src": "api/index.go",
+            "use": "@vercel/go"
+        }
+    ]
+}

@@ -70,6 +70,7 @@ func Handler(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case "/fire":
+	case "/firetest":
 		res.Write(fireResponse())
 		return
 

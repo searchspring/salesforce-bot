@@ -1,2 +1,7 @@
-.now
 .env
+
+.now
+.vercel
+
+.idea
+.vscode

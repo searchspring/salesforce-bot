@@ -3,7 +3,9 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -11,11 +13,26 @@ import (
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 	"searchspring.com/slack/gapi"
 	"searchspring.com/slack/nextopia"
 	"searchspring.com/slack/salesforce"
 )
+
+type envVars struct {
+	SlackVerificationToken      string `required:"true" split_words:"true"`
+	SlackOauthToken             string `required:"true" split_words:"true"`
+	SalesforceURL               string `split_words:"true"`
+	SalesforceUser              string `split_words:"true"`
+	SalesforcePassword          string `split_words:"true"`
+	SalesforceToken             string `split_words:"true"`
+	NextopiaUser                string `split_words:"true"`
+	NextopiaPassword            string `split_words:"true"`
+	GcpServiceAccountEmail      string `split_words:"true"`
+	GcpServiceAccountPrivateKey string `split_words:"true"`
+	GdriveFireDocFolderID       string `split_words:"true"`
+}
 
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
@@ -32,41 +49,46 @@ func containsEmptyString(vars ...string) bool {
 
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
-	slackVerificationCode := mustGetEnv("SLACK_VERIFICATION_TOKEN")
-	slackOauthToken := mustGetEnv("SLACK_OAUTH_TOKEN")
-	sfURL, sfUser, sfPassword, sfToken, nxUser, nxPassword, gapiEmail, gapiPrivateKey, fireDocFolderID := getEnvironmentValues()
+	var env envVars
+	err := envconfig.Process("", &env)
+	if err != nil {
+		log.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	s, err := slack.SlashCommandParse(r)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		log.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if !s.ValidateToken(slackVerificationCode) {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("slack verification failed"))
+	if !s.ValidateToken(env.SlackVerificationToken) {
+		err := errors.New("slack verification failed")
+		log.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	salesForceVars := []string{sfURL, sfUser, sfPassword, sfToken}
+	salesForceVars := []string{env.SalesforceURL, env.SalesforceUser, env.SalesforcePassword, env.SalesforceToken}
 	if salesForceDAO == nil && !containsEmptyString(salesForceVars...) {
-		salesForceDAO, err = salesforce.NewDAO(sfURL, sfUser, sfPassword, sfToken)
+		salesForceDAO, err = salesforce.NewDAO(env.SalesforceURL, env.SalesforceUser, env.SalesforcePassword, env.SalesforceToken)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("salesforce client was not created successfully: " + err.Error()))
+			log.Println(err.Error())
+			http.Error(w, "salesforce client was not created successfully: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	nextopiaVars := []string{nxUser, nxPassword}
+	nextopiaVars := []string{env.NextopiaUser, env.NextopiaPassword}
 	if nextopiaDAO == nil && !containsEmptyString(nextopiaVars...) {
-		nextopiaDAO = nextopia.NewDAO(nxUser, nxPassword)
+		nextopiaDAO = nextopia.NewDAO(env.NextopiaUser, env.NextopiaPassword)
 	}
 
-	gapiVars := []string{gapiEmail, gapiPrivateKey, fireDocFolderID}
+	gapiVars := []string{env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID}
 	if gapiDAO == nil && !containsEmptyString(gapiVars...) {
-		gapiDAO = gapi.NewDAO(gapiEmail, gapiPrivateKey, fireDocFolderID)
+		gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID)
 	}
 
 	w.Header().Set("Content-type", "application/json")
@@ -77,14 +99,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if salesForceDAO == nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Missing required Salesforce credentials."))
+			err := errors.New("missing required Salesforce credentials")
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		responseJSON, err := salesForceDAO.Query(s.Text)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Write(responseJSON)
@@ -97,8 +120,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if gapiDAO == nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Missing required Google API credentials."))
+			err := errors.New("missing required Google API credentials")
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// We only have 3 seconds to initially respond
@@ -107,7 +131,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		// that slack will drop our connection before we finish doing everything and responding
 		fireTitle := cleanFireTitle(s.Text)
 		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
-		go fireResponse(gapiDAO, fireDocFolderID, fireTitle, s.ResponseURL)
+		go fireResponse(gapiDAO, env.GdriveFireDocFolderID, fireTitle, s.ResponseURL)
 		return
 
 	case "/firedown":
@@ -120,14 +144,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if nextopiaDAO == nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Missing required Nextopia credentials."))
+			err := errors.New("missing required Nextopia credentials")
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		responseJSON, err := nextopiaDAO.Query(s.Text)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Write(responseJSON)
@@ -139,14 +164,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if salesForceDAO == nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Missing required Salesforce credentials."))
+			err := errors.New("missing required Salesforce credentials")
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		responseJSON, err := salesForceDAO.IDQuery(s.Text)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			log.Println(err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Write(responseJSON)
@@ -157,7 +183,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			writeHelpFeature(w)
 			return
 		}
-		sendSlackMessage(slackOauthToken, s.Text, s.UserID)
+		sendSlackMessage(env.SlackOauthToken, s.Text, s.UserID)
 		responseJSON := featureResponse(s.Text)
 		w.Write(responseJSON)
 		return
@@ -181,8 +207,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("unknown slash command " + s.Command))
+		err := errors.New("unknown slash command " + s.Command)
+		log.Println(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }

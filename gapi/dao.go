@@ -53,10 +53,13 @@ func NewDAO(vars map[string]string) (DAO, error) {
 	}, nil
 }
 
-func jsonDecode(body io.ReadCloser) map[string]interface{} {
+func jsonDecode(body io.ReadCloser) (map[string]interface{}, error) {
 	data := make(map[string]interface{})
-	json.NewDecoder(body).Decode(&data)
-	return data
+	err := json.NewDecoder(body).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // GenerateFireDoc creates a new Fire Doc in GDrive as needed
@@ -95,7 +98,12 @@ func (d *DAOImpl) createFireDoc(title string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	documentID, found := jsonDecode(resp.Body)["documentId"]
+	res, err := jsonDecode(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	documentID, found := res["documentId"]
 	if !found {
 		return "", err
 	}

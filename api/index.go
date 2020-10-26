@@ -113,8 +113,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.Write(responseJSON)
 		return
 
-	case "/fire":
-	case "/firetest":
+	case "/fire", "/firetest":
 		if strings.TrimSpace(s.Text) == "help" {
 			writeHelpFire(w)
 			return

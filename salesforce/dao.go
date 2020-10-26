@@ -9,9 +9,10 @@ import (
 
 	"github.com/nlopes/slack"
 	"github.com/simpleforce/simpleforce"
+	"searchspring.com/slack/validator"
 )
 
-// List of platforms in salesforce
+// Platforms is a list of platforms in salesforce
 var Platforms = []string{
 	"3dcart",
 	"BigCommerce",
@@ -37,22 +38,29 @@ type accountInfo struct {
 	Provider    string
 }
 
+// DAO acts as the salesforce DAO
 type DAO interface {
 	Query(query string) ([]byte, error)
 	IDQuery(query string) ([]byte, error)
 	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
 }
 
+// DAOImpl defines the properties of the DAO
 type DAOImpl struct {
 	Client *simpleforce.Client
 }
 
-func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) (DAO, error) {
-	client := simpleforce.NewClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
+// NewDAO returns the salesforce DAO
+func NewDAO(vars map[string]string) (DAO, error) {
+	blanks := validator.FindBlankVals(vars)
+	if len(blanks) > 0 {
+		return nil, fmt.Errorf("the following env vars are not set: %s", strings.Join(blanks, ", "))
+	}
+	client := simpleforce.NewClient(vars["SF_URL"], simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
 	if client == nil {
 		return nil, fmt.Errorf("nil returned from client creation")
 	}
-	err := client.LoginPassword(sfUser, sfPassword, sfToken)
+	err := client.LoginPassword(vars["SF_USER"], vars["SF_PASSWORD"], vars["SF_TOKEN"])
 	if err != nil {
 		return nil, err
 	}

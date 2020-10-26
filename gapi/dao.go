@@ -15,6 +15,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
+	"searchspring.com/slack/validator"
 )
 
 // DAO acts as the gapi DAO
@@ -31,11 +32,15 @@ type DAOImpl struct {
 }
 
 // NewDAO returns a DAO including a Google API authenticated HTTP client
-func NewDAO(email string, privateKey string, folderID string) DAO {
+func NewDAO(vars map[string]string) (DAO, error) {
+	blanks := validator.FindBlankVals(vars)
+	if len(blanks) > 0 {
+		return nil, fmt.Errorf("the following env vars are not set: %s", strings.Join(blanks, ", "))
+	}
 	scopes := []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
 	conf := &jwt.Config{
-		Email:      email,
-		PrivateKey: []byte(privateKey),
+		Email:      vars["GCP_SERVICE_ACCOUNT_EMAIL"],
+		PrivateKey: []byte(vars["GCP_SERVICE_ACCOUNT_PRIVATE_KEY"]),
 		Scopes:     scopes,
 		TokenURL:   google.JWTTokenURL,
 	}
@@ -44,8 +49,8 @@ func NewDAO(email string, privateKey string, folderID string) DAO {
 		Email:      conf.Email,
 		PrivateKey: conf.PrivateKey,
 		Client:     client,
-		FolderID:   folderID,
-	}
+		FolderID:   vars["GDRIVE_FIRE_DOC_FOLDER_ID"],
+	}, nil
 }
 
 func jsonDecode(body io.ReadCloser) map[string]interface{} {

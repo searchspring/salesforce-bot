@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -23,12 +22,12 @@ import (
 type envVars struct {
 	SlackVerificationToken      string `required:"true" split_words:"true"`
 	SlackOauthToken             string `required:"true" split_words:"true"`
-	SalesforceURL               string `split_words:"true"`
-	SalesforceUser              string `split_words:"true"`
-	SalesforcePassword          string `split_words:"true"`
-	SalesforceToken             string `split_words:"true"`
-	NextopiaUser                string `split_words:"true"`
-	NextopiaPassword            string `split_words:"true"`
+	SfURL                       string `split_words:"true"`
+	SfUser                      string `split_words:"true"`
+	SfPassword                  string `split_words:"true"`
+	SfToken                     string `split_words:"true"`
+	NxUser                      string `split_words:"true"`
+	NxPassword                  string `split_words:"true"`
 	GcpServiceAccountEmail      string `split_words:"true"`
 	GcpServiceAccountPrivateKey string `split_words:"true"`
 	GdriveFireDocFolderID       string `split_words:"true"`
@@ -37,15 +36,6 @@ type envVars struct {
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
 var gapiDAO gapi.DAO = nil
-
-func containsEmptyString(vars ...string) bool {
-	for _, v := range vars {
-		if v == "" {
-			return true
-		}
-	}
-	return false
-}
 
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -71,24 +61,31 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	salesForceVars := []string{env.SalesforceURL, env.SalesforceUser, env.SalesforcePassword, env.SalesforceToken}
-	if salesForceDAO == nil && !containsEmptyString(salesForceVars...) {
-		salesForceDAO, err = salesforce.NewDAO(env.SalesforceURL, env.SalesforceUser, env.SalesforcePassword, env.SalesforceToken)
-		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, "salesforce client was not created successfully: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
+	salesForceDAO, err = salesforce.NewDAO(map[string]string{
+		"SF_URL":      env.SfURL,
+		"SF_USER":     env.SfUser,
+		"SF_PASSWORD": env.SfPassword,
+		"SF_TOKEN":    env.SfToken,
+	})
+	if err != nil {
+		log.Println(err.Error())
 	}
 
-	nextopiaVars := []string{env.NextopiaUser, env.NextopiaPassword}
-	if nextopiaDAO == nil && !containsEmptyString(nextopiaVars...) {
-		nextopiaDAO = nextopia.NewDAO(env.NextopiaUser, env.NextopiaPassword)
+	nextopiaDAO, err = nextopia.NewDAO(map[string]string{
+		"NX_USER":     env.NxUser,
+		"NX_PASSWORD": env.NxPassword,
+	})
+	if err != nil {
+		log.Println(err.Error())
 	}
 
-	gapiVars := []string{env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID}
-	if gapiDAO == nil && !containsEmptyString(gapiVars...) {
-		gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID)
+	gapiDAO, err = gapi.NewDAO(map[string]string{
+		"GCP_SERVICE_ACCOUNT_EMAIL":       env.GcpServiceAccountEmail,
+		"GCP_SERVICE_ACCOUNT_PRIVATE_KEY": env.GcpServiceAccountPrivateKey,
+		"GDRIVE_FIRE_DOC_FOLDER_ID":       env.GdriveFireDocFolderID,
+	})
+	if err != nil {
+		log.Println(err.Error())
 	}
 
 	w.Header().Set("Content-type", "application/json")
@@ -343,26 +340,4 @@ func fireDownResponse() []byte {
 	}
 	json, _ := json.Marshal(msg)
 	return json
-}
-
-func mustGetEnv(key string) string {
-	if v, ok := os.LookupEnv(key); !ok {
-		panic(fmt.Sprintf("Variable %s is not set", key))
-	} else if v == "" {
-		panic(fmt.Sprintf("Variable %s is blank", key))
-	} else {
-		return v
-	}
-}
-
-func getEnvironmentValues() (string, string, string, string, string, string, string, string, string) {
-	return os.Getenv("SF_URL"),
-		os.Getenv("SF_USER"),
-		os.Getenv("SF_PASSWORD"),
-		os.Getenv("SF_TOKEN"),
-		os.Getenv("NX_USER"),
-		os.Getenv("NX_PASSWORD"),
-		os.Getenv("GCP_SERVICE_ACCOUNT_EMAIL"),
-		os.Getenv("GCP_SERVICE_ACCOUNT_PRIVATE_KEY"),
-		os.Getenv("GDRIVE_FIRE_DOC_FOLDER_ID")
 }

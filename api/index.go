@@ -42,15 +42,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 
 	s, err := slack.SlashCommandParse(r)
 	if err != nil {
-		log.Println(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 
@@ -96,15 +94,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if salesForceDAO == nil {
-			err := errors.New("missing required Salesforce credentials")
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
 		responseJSON, err := salesForceDAO.Query(s.Text)
 		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, err)
 			return
 		}
 		w.Write(responseJSON)
@@ -116,9 +111,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if gapiDAO == nil {
-			err := errors.New("missing required Google API credentials")
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, errors.New("missing required Google API credentials"))
 			return
 		}
 		// We only have 3 seconds to initially respond
@@ -140,15 +133,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if nextopiaDAO == nil {
-			err := errors.New("missing required Nextopia credentials")
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, errors.New("missing required Nextopia credentials"))
 			return
 		}
 		responseJSON, err := nextopiaDAO.Query(s.Text)
 		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, err)
 			return
 		}
 		w.Write(responseJSON)
@@ -160,15 +150,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if salesForceDAO == nil {
-			err := errors.New("missing required Salesforce credentials")
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
 		responseJSON, err := salesForceDAO.IDQuery(s.Text)
 		if err != nil {
-			log.Println(err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			internalServerError(w, err)
 			return
 		}
 		w.Write(responseJSON)
@@ -203,9 +190,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		err := errors.New("unknown slash command " + s.Command)
-		log.Println(err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, errors.New("unknown slash command "+s.Command))
 		return
 	}
 }
@@ -340,4 +325,9 @@ func fireDownResponse() []byte {
 	}
 	json, _ := json.Marshal(msg)
 	return json
+}
+
+func internalServerError(w http.ResponseWriter, err error) {
+	log.Println(err.Error())
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }

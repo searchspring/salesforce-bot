@@ -35,6 +35,9 @@ Nebo is a slackbot that helps us ask salesforce questions without having to go i
     SLACK_OAUTH_TOKEN=<slack oauth token>
     NX_USER=<nx user>
     NX_PASSWORD=<nx password>
+    GCP_SERVICE_ACCOUNT_EMAIL=<nebo gcp service account email>
+    GCP_SERVICE_ACCOUNT_PRIVATE_KEY=<nebo gcp service account private key>
+    GDRIVE_FIRE_DOC_FOLDER_ID=<gdrive folder id>
     ```
 2. Run the server `vercel dev`
 3. Run ngrok `ngrok http 3000`

@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -20,17 +21,18 @@ import (
 )
 
 type envVars struct {
-	SlackVerificationToken      string `required:"true" split_words:"true"`
-	SlackOauthToken             string `required:"true" split_words:"true"`
-	SfURL                       string `split_words:"true"`
-	SfUser                      string `split_words:"true"`
-	SfPassword                  string `split_words:"true"`
-	SfToken                     string `split_words:"true"`
-	NxUser                      string `split_words:"true"`
-	NxPassword                  string `split_words:"true"`
-	GcpServiceAccountEmail      string `split_words:"true"`
-	GcpServiceAccountPrivateKey string `split_words:"true"`
-	GdriveFireDocFolderID       string `split_words:"true"`
+	DevMode                     string `split_words:"true" required:"true" default:"production"`
+	SlackVerificationToken      string `split_words:"true" required:"true"`
+	SlackOauthToken             string `split_words:"true" required:"true"`
+	SfURL                       string `split_words:"true" required:"true"`
+	SfUser                      string `split_words:"true" required:"true"`
+	SfPassword                  string `split_words:"true" required:"true"`
+	SfToken                     string `split_words:"true" required:"true"`
+	NxUser                      string `split_words:"true" required:"true"`
+	NxPassword                  string `split_words:"true" required:"true"`
+	GcpServiceAccountEmail      string `split_words:"true" required:"true"`
+	GcpServiceAccountPrivateKey string `split_words:"true" required:"true"`
+	GdriveFireDocFolderID       string `split_words:"true" required:"true"`
 }
 
 var salesForceDAO salesforce.DAO = nil
@@ -46,6 +48,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	blanks := findBlankEnvVars(env)
+	if len(blanks) > 0 {
+		err := fmt.Errorf("the following env vars are blank: %s", strings.Join(blanks, ", "))
+		if env.DevMode != "development" {
+			internalServerError(w, err)
+			return
+		}
+		log.Printf(err.Error())
+	}
+
 	s, err := slack.SlashCommandParse(r)
 	if err != nil {
 		internalServerError(w, err)
@@ -59,32 +71,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	salesForceDAO, err = salesforce.NewDAO(map[string]string{
-		"SF_URL":      env.SfURL,
-		"SF_USER":     env.SfUser,
-		"SF_PASSWORD": env.SfPassword,
-		"SF_TOKEN":    env.SfToken,
-	})
-	if err != nil {
-		log.Println(err.Error())
-	}
-
-	nextopiaDAO, err = nextopia.NewDAO(map[string]string{
-		"NX_USER":     env.NxUser,
-		"NX_PASSWORD": env.NxPassword,
-	})
-	if err != nil {
-		log.Println(err.Error())
-	}
-
-	gapiDAO, err = gapi.NewDAO(map[string]string{
-		"GCP_SERVICE_ACCOUNT_EMAIL":       env.GcpServiceAccountEmail,
-		"GCP_SERVICE_ACCOUNT_PRIVATE_KEY": env.GcpServiceAccountPrivateKey,
-		"GDRIVE_FIRE_DOC_FOLDER_ID":       env.GdriveFireDocFolderID,
-	})
-	if err != nil {
-		log.Println(err.Error())
-	}
+	nextopiaDAO = nextopia.NewDAO(env.NxUser, env.NxPassword)
+	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
+	gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID)
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
@@ -330,4 +319,14 @@ func fireDownResponse() []byte {
 func internalServerError(w http.ResponseWriter, err error) {
 	log.Println(err.Error())
 	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+func findBlankEnvVars(env envVars) []string {
+	var blanks []string
+	valueOfStruct := reflect.ValueOf(env)
+	typeOfStruct := valueOfStruct.Type()
+	for i := 0; i < valueOfStruct.NumField(); i++ {
+		blanks = append(blanks, typeOfStruct.Field(i).Name)
+	}
+	return blanks
 }

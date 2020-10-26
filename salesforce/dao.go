@@ -3,6 +3,7 @@ package salesforce
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"regexp"
 	"sort"
 	"strings"
@@ -51,22 +52,23 @@ type DAOImpl struct {
 }
 
 // NewDAO returns the salesforce DAO
-func NewDAO(vars map[string]string) (DAO, error) {
-	blanks := validator.FindBlankVals(vars)
-	if len(blanks) > 0 {
-		return nil, fmt.Errorf("the following env vars are not set: %s", strings.Join(blanks, ", "))
+func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO {
+	if validator.ContainsEmptyString(sfURL, sfUser, sfPassword, sfToken) {
+		return nil
 	}
-	client := simpleforce.NewClient(vars["SF_URL"], simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
+	client := simpleforce.NewClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
 	if client == nil {
-		return nil, fmt.Errorf("nil returned from client creation")
+		log.Println("nil returned from client creation")
+		return nil
 	}
-	err := client.LoginPassword(vars["SF_USER"], vars["SF_PASSWORD"], vars["SF_TOKEN"])
+	err := client.LoginPassword(sfUser, sfPassword, sfToken)
 	if err != nil {
-		return nil, err
+		log.Println(err.Error())
+		return nil
 	}
 	return &DAOImpl{
 		Client: client,
-	}, nil
+	}
 }
 
 func (s *DAOImpl) Query(search string) ([]byte, error) {

@@ -32,15 +32,14 @@ type DAOImpl struct {
 }
 
 // NewDAO returns a DAO including a Google API authenticated HTTP client
-func NewDAO(vars map[string]string) (DAO, error) {
-	blanks := validator.FindBlankVals(vars)
-	if len(blanks) > 0 {
-		return nil, fmt.Errorf("the following env vars are not set: %s", strings.Join(blanks, ", "))
+func NewDAO(email string, privateKey string, folderID string) DAO {
+	if validator.ContainsEmptyString(email, privateKey, folderID) {
+		return nil
 	}
 	scopes := []string{"https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/documents"}
 	conf := &jwt.Config{
-		Email:      vars["GCP_SERVICE_ACCOUNT_EMAIL"],
-		PrivateKey: []byte(vars["GCP_SERVICE_ACCOUNT_PRIVATE_KEY"]),
+		Email:      email,
+		PrivateKey: []byte(privateKey),
 		Scopes:     scopes,
 		TokenURL:   google.JWTTokenURL,
 	}
@@ -49,8 +48,8 @@ func NewDAO(vars map[string]string) (DAO, error) {
 		Email:      conf.Email,
 		PrivateKey: conf.PrivateKey,
 		Client:     client,
-		FolderID:   vars["GDRIVE_FIRE_DOC_FOLDER_ID"],
-	}, nil
+		FolderID:   folderID,
+	}
 }
 
 func jsonDecode(body io.ReadCloser) (map[string]interface{}, error) {

@@ -11,7 +11,8 @@
     "NX_PASSWORD": "@nx-password",
     "GCP_SERVICE_ACCOUNT_EMAIL": "@gcp-service-account-email",
     "GCP_SERVICE_ACCOUNT_PRIVATE_KEY": "@gcp-service-account-private-key",
-    "GDRIVE_FIRE_DOC_FOLDER_ID": "@gdrive_fire_doc_folder_id"
+    "GDRIVE_FIRE_DOC_FOLDER_ID": "@gdrive_fire_doc_folder_id",
+    "DEV_MODE": "@dev_mode"
   },
   "builds": [
     {

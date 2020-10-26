@@ -6,7 +6,7 @@ import "strings"
 func FindBlankVals(m map[string]string) []string {
 	var blanks []string
 	for k, v := range m {
-		if strings.Trim(v, " ") == "" {
+		if strings.TrimSpace(v) == "" {
 			blanks = append(blanks, k)
 		}
 	}

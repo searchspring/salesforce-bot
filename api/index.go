@@ -289,7 +289,7 @@ func fireResponse(d gapi.DAO, folderID string, title string, responseURL string)
 }
 
 func cleanFireTitle(title string) string {
-	title = strings.Trim(title, " ")
+	title = strings.TrimSpace(title)
 	if title == "" {
 		title = "Untitled Fire"
 	}

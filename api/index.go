@@ -22,7 +22,7 @@ import (
 )
 
 type envVars struct {
-	DevMode                     string `split_words:"true" required:"true" default:"production"`
+	DevMode                     string `split_words:"true" required:"true"`
 	SlackVerificationToken      string `split_words:"true" required:"true"`
 	SlackOauthToken             string `split_words:"true" required:"true"`
 	SfURL                       string `split_words:"true" required:"true"`

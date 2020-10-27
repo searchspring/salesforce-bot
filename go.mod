@@ -9,7 +9,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nlopes/slack v0.6.0
 	github.com/simpleforce/simpleforce v0.0.0-20200222080651-7a01fe74c3db
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.1
 	go.opencensus.io v0.22.5 // indirect
 	golang.org/x/net v0.0.0-20201010224723-4f7140c49acb
 	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43

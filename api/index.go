@@ -117,7 +117,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		// So we ACK before doing our work because Google APIs can be slow enough
 		// that slack will drop our connection before we finish doing everything and responding
 		fireTitle := cleanFireTitle(s.Text)
-		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
+		initialMsg := "New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"
+		postSlackMessage(s.ResponseURL, slack.ResponseTypeInChannel, initialMsg)
 		go fireResponse(gapiDAO, sapiDAO, env.GdriveFireDocFolderID, fireTitle, s.ResponseURL, s.UserID)
 		return
 
@@ -279,12 +280,20 @@ func getMeetLink(search string) string {
 func fireResponse(g gapi.DAO, s sapi.DAO, folderID string, title string, responseURL string, userID string) {
 	now, err := sapiDAO.GetUserNow(userID)
 	documentID, err := g.GenerateFireDoc(title, now)
+	postSlackMessage(responseURL, slack.ResponseTypeInChannel, fireChecklist(folderID, documentID, title, err))
+}
+
+func postSlackMessage(responseURL string, responseType string, text string) error {
 	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeInChannel,
-		Text:         fireChecklist(folderID, documentID, title, err),
+		ResponseType: responseType,
+		Text:         text,
 	}
-	json, _ := json.Marshal(msg)
-	http.Post(responseURL, "application/json", bytes.NewBuffer(json))
+	json, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	_, err = http.Post(responseURL, "application/json", bytes.NewBuffer(json))
+	return err
 }
 
 func cleanFireTitle(title string) string {
@@ -336,7 +345,9 @@ func findBlankEnvVars(env envVars) []string {
 	valueOfStruct := reflect.ValueOf(env)
 	typeOfStruct := valueOfStruct.Type()
 	for i := 0; i < valueOfStruct.NumField(); i++ {
-		blanks = append(blanks, typeOfStruct.Field(i).Name)
+		if valueOfStruct.Field(i).Interface() == "" {
+			blanks = append(blanks, typeOfStruct.Field(i).Name)
+		}
 	}
 	return blanks
 }

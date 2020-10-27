@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,7 +77,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	sapiDAO = sapi.NewDAO(env.SlackVerificationToken, env.SlackOauthToken)
 	nextopiaDAO = nextopia.NewDAO(env.NxUser, env.NxPassword)
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-	gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID)
+
+	decodedKey, err := base64.StdEncoding.DecodeString(env.GcpServiceAccountPrivateKey)
+	if err != nil {
+		sendInternalServerError(w, err)
+	}
+	gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, string(decodedKey), env.GdriveFireDocFolderID)
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {

@@ -1,20 +1,18 @@
 package gapi
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
+	"google.golang.org/api/docs/v1"
+	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/option"
 	"searchspring.com/slack/validator"
 )
 
@@ -25,10 +23,11 @@ type DAO interface {
 
 // DAOImpl defines the properties of the DAO
 type DAOImpl struct {
-	Email      string
-	PrivateKey []byte
-	Client     *http.Client
-	FolderID   string
+	Email        string
+	PrivateKey   []byte
+	DocsService  *docs.Service
+	DriveService *drive.Service
+	FolderID     string
 }
 
 // NewDAO returns a DAO including a Google API authenticated HTTP client
@@ -43,30 +42,37 @@ func NewDAO(email string, privateKey string, folderID string) DAO {
 		Scopes:     scopes,
 		TokenURL:   google.JWTTokenURL,
 	}
-	client := conf.Client(oauth2.NoContext)
-	return &DAOImpl{
-		Email:      conf.Email,
-		PrivateKey: conf.PrivateKey,
-		Client:     client,
-		FolderID:   folderID,
-	}
-}
-
-func jsonDecode(body io.ReadCloser) (map[string]interface{}, error) {
-	data := make(map[string]interface{})
-	err := json.NewDecoder(body).Decode(&data)
+	ctx := context.Background()
+	creds := &google.Credentials{TokenSource: conf.TokenSource(ctx)}
+	docsService, err := docs.NewService(ctx, option.WithCredentials(creds))
+	driveService, err := drive.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
-		return nil, err
+		log.Println(err.Error())
+		return nil
 	}
-	return data, nil
+	return &DAOImpl{
+		Email:        conf.Email,
+		PrivateKey:   conf.PrivateKey,
+		DocsService:  docsService,
+		DriveService: driveService,
+		FolderID:     folderID,
+	}
 }
 
 // GenerateFireDoc creates a new Fire Doc in GDrive as needed
 func (d *DAOImpl) GenerateFireDoc(title string) (string, error) {
-	documentID, err := d.createFireDoc(title)
+	now := time.Now().UTC()
+	documentID, err := d.createFireDoc(title, now)
 	if err != nil {
 		log.Println(err)
 		return "", errors.New("Error creating fire doc")
+	}
+
+	err = d.writeDoc(documentID, now)
+	if err != nil {
+		log.Println(err)
+		// In this case we can still use the created doc so there is an error and a documentID returned
+		return documentID, errors.New("Unable to write default content to fire doc")
 	}
 
 	err = d.assignParentFolder(documentID)
@@ -74,124 +80,72 @@ func (d *DAOImpl) GenerateFireDoc(title string) (string, error) {
 		log.Println(err)
 		return "", errors.New("Unable to move fire doc into correct folder in GDrive")
 	}
-
-	err = d.writeDoc(documentID)
-	if err != nil {
-		log.Println(err)
-		// In this case we can still use the created doc so there is an error and a documentID returned
-		return documentID, errors.New("Unable to write default content to fire doc")
-	}
 	return documentID, nil
 }
 
-func (d *DAOImpl) createFireDoc(title string) (string, error) {
-	now := time.Now().Format(time.RFC3339)
-	requestBody, err := json.Marshal(map[string]string{"title": fmt.Sprintf("%s %s", now, title)})
+func (d *DAOImpl) createFireDoc(title string, now time.Time) (string, error) {
+	document := &docs.Document{Title: fmt.Sprintf("%s %s", now.Format(time.RFC3339), title)}
+	doc, err := d.DocsService.Documents.Create(document).Do()
 	if err != nil {
 		return "", err
 	}
-
-	resp, err := d.Client.Post("https://docs.googleapis.com/v1/documents", "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	res, err := jsonDecode(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	documentID, found := res["documentId"]
-	if !found {
-		return "", err
-	}
-
-	documentIDString, ok := documentID.(string)
-	if !ok {
-		return "", err
-	}
-
-	return documentIDString, nil
+	return doc.DocumentId, nil
 }
 
 func (d *DAOImpl) assignParentFolder(documentID string) error {
-	requestBody, err := json.Marshal(map[string]string{"id": d.FolderID})
+	file, err := d.DriveService.Files.Get(documentID).Do()
 	if err != nil {
 		return err
 	}
 
-	resp, err := d.Client.Post(fmt.Sprintf("https://www.googleapis.com/drive/v2/files/%s/parents", documentID), "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
+	_, err = d.DriveService.Files.Update(file.Id, file).AddParents(d.FolderID).Do()
 	if err != nil {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Error moving document %s to folder %s:\n%s", documentID, d.FolderID, body)
-	}
 	return nil
 }
 
-func (d *DAOImpl) writeDoc(documentID string) error {
-	lines, textRequest := fireDocTextToInsert()
-	requests := map[string][]interface{}{"requests": {
-		textRequest,
-		fireDocStyleToApply(1, len(lines[0])+1),
-		fireDocBulletsToApply(len(lines[0])+2, len(lines[1])),
-	}}
-	requestBody, err := json.Marshal(requests)
-	if err != nil {
-		return err
-	}
-
-	resp, err := d.Client.Post(fmt.Sprintf("https://docs.googleapis.com/v1/documents/%s:batchUpdate", documentID), "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Error writing to document %s:\n%s", documentID, body)
-	}
-	return nil
-}
-
-func fireDocStyleToApply(start int, end int) map[string]interface{} {
-	textStyle := map[string]bool{"bold": true}
-	styleRange := map[string]interface{}{"segmentId": "", "startIndex": start, "endIndex": end}
-	updateTextStyle := map[string]interface{}{"textStyle": textStyle, "fields": "*", "range": styleRange}
-	request := map[string]interface{}{"updateTextStyle": updateTextStyle}
-	return request
-}
-
-func fireDocBulletsToApply(start int, end int) map[string]interface{} {
-	bulletPreset := "BULLET_DISC_CIRCLE_SQUARE"
-	bulletRange := map[string]interface{}{"segmentId": "", "startIndex": start, "endIndex": end}
-	createParagraphBullets := map[string]interface{}{"range": bulletRange, "bulletPreset": bulletPreset}
-	request := map[string]interface{}{"createParagraphBullets": createParagraphBullets}
-	return request
-}
-
-func fireDocTextToInsert() ([]string, map[string]interface{}) {
-	now := time.Now()
+func (d *DAOImpl) writeDoc(documentID string, now time.Time) error {
 	zone, _ := now.Zone()
-	endOfSegmentLocation := map[string]interface{}{"segmentId": ""}
 	lines := []string{
 		fmt.Sprintf("Timeline (%s)", zone),
 		fmt.Sprintf("%s - Fire was called", now.Format("2006-01-02 15:04")),
 	}
-	insertText := map[string]interface{}{"text": strings.Join(lines, "\n"), "endOfSegmentLocation": endOfSegmentLocation}
-	request := map[string]interface{}{"insertText": insertText}
-	return lines, request
+	requests := &docs.BatchUpdateDocumentRequest{
+		Requests: []*docs.Request{
+			&docs.Request{
+				InsertText: &docs.InsertTextRequest{
+					Location: &docs.Location{Index: 1},
+					Text:     strings.Join(lines, "\n"),
+				},
+			},
+			&docs.Request{
+				UpdateTextStyle: &docs.UpdateTextStyleRequest{
+					Range: &docs.Range{
+						StartIndex: 1,
+						EndIndex:   int64(len(lines[0]) + 1),
+					},
+					Fields: "*",
+					TextStyle: &docs.TextStyle{
+						Bold: true,
+					},
+				},
+			},
+			&docs.Request{
+				CreateParagraphBullets: &docs.CreateParagraphBulletsRequest{
+					BulletPreset: "BULLET_DISC_CIRCLE_SQUARE",
+					Range: &docs.Range{
+						StartIndex: int64(len(lines[0]) + 2),
+						EndIndex:   int64(len(lines[1])),
+					},
+				},
+			},
+		},
+	}
+	_, err := d.DocsService.Documents.BatchUpdate(documentID, requests).Do()
+	if err != nil {
+		return err
+	}
+	return nil
 }

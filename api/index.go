@@ -18,6 +18,7 @@ import (
 	"searchspring.com/slack/gapi"
 	"searchspring.com/slack/nextopia"
 	"searchspring.com/slack/salesforce"
+	"searchspring.com/slack/sapi"
 )
 
 type envVars struct {
@@ -35,6 +36,7 @@ type envVars struct {
 	GdriveFireDocFolderID       string `split_words:"true" required:"true"`
 }
 
+var sapiDAO sapi.DAO = nil
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
 var gapiDAO gapi.DAO = nil
@@ -71,6 +73,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sapiDAO = sapi.NewDAO(env.SlackVerificationToken, env.SlackOauthToken)
 	nextopiaDAO = nextopia.NewDAO(env.NxUser, env.NxPassword)
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
 	gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, env.GcpServiceAccountPrivateKey, env.GdriveFireDocFolderID)
@@ -109,7 +112,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		// that slack will drop our connection before we finish doing everything and responding
 		fireTitle := cleanFireTitle(s.Text)
 		w.Write([]byte("New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"))
-		go fireResponse(gapiDAO, env.GdriveFireDocFolderID, fireTitle, s.ResponseURL)
+		go fireResponse(gapiDAO, sapiDAO, env.GdriveFireDocFolderID, fireTitle, s.ResponseURL, s.UserID)
 		return
 
 	case "/firedown":
@@ -267,8 +270,9 @@ func getMeetLink(search string) string {
 	return "g.co/meet/" + name
 }
 
-func fireResponse(d gapi.DAO, folderID string, title string, responseURL string) {
-	documentID, err := d.GenerateFireDoc(title)
+func fireResponse(g gapi.DAO, s sapi.DAO, folderID string, title string, responseURL string, userID string) {
+	now, err := sapiDAO.GetUserNow(userID)
+	documentID, err := g.GenerateFireDoc(title, now)
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
 		Text:         fireChecklist(folderID, documentID, title, err),

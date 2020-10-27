@@ -18,7 +18,7 @@ import (
 
 // DAO acts as the gapi DAO
 type DAO interface {
-	GenerateFireDoc(title string) (string, error)
+	GenerateFireDoc(title string, now time.Time) (string, error)
 }
 
 // DAOImpl defines the properties of the DAO
@@ -60,8 +60,7 @@ func NewDAO(email string, privateKey string, folderID string) DAO {
 }
 
 // GenerateFireDoc creates a new Fire Doc in GDrive as needed
-func (d *DAOImpl) GenerateFireDoc(title string) (string, error) {
-	now := time.Now().UTC()
+func (d *DAOImpl) GenerateFireDoc(title string, now time.Time) (string, error) {
 	documentID, err := d.createFireDoc(title, now)
 	if err != nil {
 		log.Println(err)

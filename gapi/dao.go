@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
 	"google.golang.org/api/docs/v1"
-	"google.golang.org/api/drive/v2"
+	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"searchspring.com/slack/validator"
 )
@@ -28,6 +30,7 @@ type DAOImpl struct {
 	DocsService  *docs.Service
 	DriveService *drive.Service
 	FolderID     string
+	Client       *http.Client
 }
 
 // NewDAO returns a DAO including a Google API authenticated HTTP client
@@ -50,12 +53,14 @@ func NewDAO(email string, privateKey string, folderID string) DAO {
 		log.Println(err.Error())
 		return nil
 	}
+	client := conf.Client(oauth2.NoContext)
 	return &DAOImpl{
 		Email:        conf.Email,
 		PrivateKey:   conf.PrivateKey,
 		DocsService:  docsService,
 		DriveService: driveService,
 		FolderID:     folderID,
+		Client:       client,
 	}
 }
 
@@ -96,12 +101,10 @@ func (d *DAOImpl) assignParentFolder(documentID string) error {
 	if err != nil {
 		return err
 	}
-
-	_, err = d.DriveService.Files.Update(file.Id, file).AddParents(d.FolderID).Do()
+	_, err = d.DriveService.Files.Update(file.Id, nil).AddParents(d.FolderID).SupportsAllDrives(true).Do()
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 

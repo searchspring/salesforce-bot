@@ -35,17 +35,9 @@ Nebo is a slackbot that helps us ask salesforce questions without having to go i
     SLACK_OAUTH_TOKEN=<slack oauth token>
     NX_USER=<nx user>
     NX_PASSWORD=<nx password>
-    GCP_SERVICE_ACCOUNT_EMAIL=<nebo gcp service account email>
-    GCP_SERVICE_ACCOUNT_PRIVATE_KEY=<nebo gcp base64 encodedservice account private key>
     GDRIVE_FIRE_DOC_FOLDER_ID=<gdrive folder id>
     DEV_MODE=<production | development>
     ```
-    * GCP credentials are in 1password `swec > nx-engineering > Google Cloud - Nebo - Service Account credentials.json`
-    * To base64 encode the `GCP_SERVICE_ACCOUNT_PRIVATE_KEY`
-        1. In a directory outside of the repo create file like `deleteme` then paste in the raw private key from 1password
-        2. In your IDE replace all `\n` with actual newlines
-        3. In your terminal run `base64 -i deleteme -o deletemetoo`
-        4. Copy the text content within `deletemetoo` and set it in your `.env` file
     * If `DEV_MODE` is set to `development` you will be able to test various commands without requiring _all_ env vars to be set to non-blank values
 2. Run the server `vercel dev`
 3. Run ngrok `ngrok http 3000`

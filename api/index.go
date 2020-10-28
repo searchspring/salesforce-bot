@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,31 +15,25 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-	"searchspring.com/slack/gapi"
 	"searchspring.com/slack/nextopia"
 	"searchspring.com/slack/salesforce"
-	"searchspring.com/slack/sapi"
 )
 
 type envVars struct {
-	DevMode                     string `split_words:"true" required:"true"`
-	SlackVerificationToken      string `split_words:"true" required:"true"`
-	SlackOauthToken             string `split_words:"true" required:"true"`
-	SfURL                       string `split_words:"true" required:"true"`
-	SfUser                      string `split_words:"true" required:"true"`
-	SfPassword                  string `split_words:"true" required:"true"`
-	SfToken                     string `split_words:"true" required:"true"`
-	NxUser                      string `split_words:"true" required:"true"`
-	NxPassword                  string `split_words:"true" required:"true"`
-	GcpServiceAccountEmail      string `split_words:"true" required:"true"`
-	GcpServiceAccountPrivateKey string `split_words:"true" required:"true"`
-	GdriveFireDocFolderID       string `split_words:"true" required:"true"`
+	DevMode                string `split_words:"true" required:"true"`
+	SlackVerificationToken string `split_words:"true" required:"true"`
+	SlackOauthToken        string `split_words:"true" required:"true"`
+	SfURL                  string `split_words:"true" required:"true"`
+	SfUser                 string `split_words:"true" required:"true"`
+	SfPassword             string `split_words:"true" required:"true"`
+	SfToken                string `split_words:"true" required:"true"`
+	NxUser                 string `split_words:"true" required:"true"`
+	NxPassword             string `split_words:"true" required:"true"`
+	GdriveFireDocFolderID  string `split_words:"true" required:"true"`
 }
 
-var sapiDAO sapi.DAO = nil
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
-var gapiDAO gapi.DAO = nil
 
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -74,15 +67,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sapiDAO = sapi.NewDAO(env.SlackVerificationToken, env.SlackOauthToken)
 	nextopiaDAO = nextopia.NewDAO(env.NxUser, env.NxPassword)
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-
-	decodedKey, err := base64.StdEncoding.DecodeString(env.GcpServiceAccountPrivateKey)
-	if err != nil {
-		sendInternalServerError(w, err)
-	}
-	gapiDAO = gapi.NewDAO(env.GcpServiceAccountEmail, string(decodedKey), env.GdriveFireDocFolderID)
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
@@ -108,18 +94,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			writeHelpFire(w)
 			return
 		}
-		if gapiDAO == nil || sapiDAO == nil {
-			sendInternalServerError(w, errors.New("missing required Google API credentials"))
-			return
-		}
-		// We only have 3 seconds to initially respond
-		// https://api.slack.com/interactivity/slash-commands#responding_to_commands
-		// So we ACK before doing our work because Google APIs can be slow enough
-		// that slack will drop our connection before we finish doing everything and responding
-		fireTitle := cleanFireTitle(s.Text)
-		initialMsg := "New Fire: :fire:*" + fireTitle + "*:fire:\nCreating fire doc & checklist now...\n"
-		postSlackMessage(s.ResponseURL, slack.ResponseTypeInChannel, initialMsg)
-		go fireResponse(gapiDAO, sapiDAO, env.GdriveFireDocFolderID, fireTitle, s.ResponseURL, s.UserID)
+		fireResponse(env.GdriveFireDocFolderID, s.Text, s.ResponseURL)
 		return
 
 	case "/firedown":
@@ -206,7 +181,7 @@ func writeHelpFeature(w http.ResponseWriter) {
 func writeHelpFire(w http.ResponseWriter) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Fire usage:\n`/fire Fire Title` - start a new fire doc named 'Fire Title' and generate a fire checklist to handle the fire",
+		Text:         "Fire usage:\n`/fire <fire title>` - generate a fire checklist to handle the fire",
 	}
 	json, _ := json.Marshal(msg)
 	w.Write(json)
@@ -277,10 +252,9 @@ func getMeetLink(search string) string {
 	return "g.co/meet/" + name
 }
 
-func fireResponse(g gapi.DAO, s sapi.DAO, folderID string, title string, responseURL string, userID string) {
-	now, err := sapiDAO.GetUserNow(userID)
-	documentID, err := g.GenerateFireDoc(title, now)
-	postSlackMessage(responseURL, slack.ResponseTypeInChannel, fireChecklist(folderID, documentID, title, err))
+func fireResponse(folderID string, title string, responseURL string) {
+	checklist := fireChecklist(folderID, title)
+	postSlackMessage(responseURL, slack.ResponseTypeInChannel, checklist)
 }
 
 func postSlackMessage(responseURL string, responseType string, text string) error {
@@ -299,28 +273,23 @@ func postSlackMessage(responseURL string, responseType string, text string) erro
 func cleanFireTitle(title string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		title = "Untitled Fire"
+		title = "New Fire"
 	}
 	return title
 }
 
-func fireChecklist(fireDocFolderID string, documentID string, title string, err error) string {
-	fireDocLink := fmt.Sprintf("<https://docs.google.com/document/d/%s/edit|%s>", documentID, title)
-	if documentID == "" {
-		fireDocLink = fmt.Sprintf("Create new fire doc <https://drive.google.com/drive/folders/%s|here>", fireDocFolderID)
-	}
-	text := "1. Designate Fire Leader\n" +
-		"2. Designate Fire Doc Maintainer: " + fireDocLink + "\n" +
-		"3. If a real fire - make an announcement in the annoucements channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
-		"4. Post a link to the fire document in the announcement channel thread\n" +
-		"5. Designate helper(s) to update announcement\n" +
-		"6. Fight! " + getMeetLink(title) + "\n" +
-		"7. Use `/firedown` when the fire is out"
-
-	if err != nil {
-		text += "\n*Warning* - Encountered error:\n"
-		text += "- " + err.Error()
-	}
+func fireChecklist(folderID string, title string) string {
+	title = cleanFireTitle(title)
+	link := fmt.Sprintf("create new fire doc <https://drive.google.com/drive/folders/%s|here>", folderID)
+	text := "...\n:fire:*" + title + "*:fire:\n" +
+		"1. Designate fire leader\n" +
+		"2. Designate fire doc maintainer and " + link + "\n" +
+		"3. Post link to fire doc in this message's thread" +
+		"4. If a real fire - make an announcement in the announcements channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
+		"5. Post a link to the fire document in the announcement channel thread\n" +
+		"6. Designate helper(s) to update announcement\n" +
+		"7. Fight! " + getMeetLink(title) + "\n" +
+		"8. Use `/firedown` when the fire is out"
 	return text
 }
 

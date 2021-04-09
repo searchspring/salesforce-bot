@@ -18,8 +18,6 @@ import (
 	//petname "github.com/dustinkirkland/golang-petname"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-
-
 	//"github.com/searchspring/nebo/nextopia"
 	//"github.com/searchspring/nebo/salesforce"
 )
@@ -35,6 +33,41 @@ type envVars struct {
 	NxUser                 string `split_words:"true" required:"false"`
 	NxPassword             string `split_words:"true" required:"false"`
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
+}
+
+type SlackDAO interface {
+	sendSlackMessage(token string, text string, authorID string, channel string) error
+	getValues() []string
+}
+
+type SlackDAOFake struct {
+	Recorded []string
+}
+type SlackDAOReal struct{}
+
+var slackDAO SlackDAO = nil
+
+func (s *SlackDAOFake) sendSlackMessage(token string, text string, authorID string, channel string) error {
+	s.Recorded = []string{token, text, authorID, channel}
+	return nil
+}
+
+func (s *SlackDAOFake) getValues() []string {
+	return s.Recorded
+}
+
+func (s *SlackDAOReal) getValues() []string {
+	return []string{"", ""}
+}
+
+func (s *SlackDAOReal) sendSlackMessage(token string, text string, authorID string, channel string) error {
+	api := slack.New(token)
+	channelID, timestamp, err := api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
+	return err
 }
 
 // Handler - check routing and call correct methods
@@ -66,22 +99,26 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprint(w, urlMap)
 
-	if _, exists := urlMap["test"]; exists  {
-		log.Println("this is a test")
-		sendSlackMessage("Iamafaketoken", "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+	if _, exists := urlMap["test"]; exists {
+		slackDAO = &SlackDAOFake{}
 	} else {
-		sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+		slackDAO = &SlackDAOReal{}
+	}
+
+	err = slackDAO.sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+	if err != nil {
+		sendInternalServerError(w, err)
 	}
 
 }
 
 func parseUrl(r *http.Request) (map[string][]string, error) {
-	expectedKeys := map[string]bool {"score": false, "name": false, "email": false, "website": false, "test": true}
+	expectedKeys := map[string]bool{"score": false, "name": false, "email": false, "website": false, "test": true}
 	u, err := url.Parse(r.URL.String())
-    
-    if err != nil {
-        return nil, err
-    }
+
+	if err != nil {
+		return nil, err
+	}
 
 	urlParams := u.Query()
 
@@ -91,10 +128,10 @@ func parseUrl(r *http.Request) (map[string][]string, error) {
 
 	for k := range urlParams {
 		//fmt.Printf( "Url Param %s is %v: ", k, string(v[0]))
-		_, exists := expectedKeys[k] 
+		_, exists := expectedKeys[k]
 		if !exists {
 			return nil, fmt.Errorf("field %s does not exist", k)
-		} 
+		}
 		expectedKeys[k] = true
 	}
 
@@ -102,37 +139,21 @@ func parseUrl(r *http.Request) (map[string][]string, error) {
 		return nil, fmt.Errorf("request is missing keys: %s", falseKeys)
 	}
 
-	return urlParams, nil 
-}
-
-func sendSlackMessage(token string, text string, authorID string, channel string) {
-	var channelID, timestamp string
-	var err error
-	if token == "Iamafaketoken" {
-
-	} else {
-		api := slack.New(token)
-		channelID, timestamp, err = api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
-	}
-	if err != nil {
-		fmt.Printf("%s\n", err)
-		return
-	}
-	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
+	return urlParams, nil
 }
 
 func mapIsTrue(inputMap map[string]bool) (string, bool) {
 	falseKeys := ""
 	for k, v := range inputMap {
 		if !v {
-			falseKeys += (k+", ")
+			falseKeys += (k + ", ")
 		}
 	}
 	if len(falseKeys) > 0 {
 		return falseKeys, true
 	}
 	return falseKeys, false
-	
+
 }
 
 func sendInternalServerError(res http.ResponseWriter, err error) {

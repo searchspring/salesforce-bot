@@ -18,6 +18,8 @@ import (
 	//petname "github.com/dustinkirkland/golang-petname"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
+
+
 	//"github.com/searchspring/nebo/nextopia"
 	//"github.com/searchspring/nebo/salesforce"
 )
@@ -64,14 +66,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprint(w, urlMap)
 
-
-	sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
-
+	if _, exists := urlMap["test"]; exists  {
+		log.Println("this is a test")
+		sendSlackMessage("Iamafaketoken", "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+	} else {
+		sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+	}
 
 }
 
 func parseUrl(r *http.Request) (map[string][]string, error) {
-	expectedKeys := map[string]bool {"score": false, "name": false, "email": false, "website": false}
+	expectedKeys := map[string]bool {"score": false, "name": false, "email": false, "website": false, "test": true}
 	u, err := url.Parse(r.URL.String())
     
     if err != nil {
@@ -84,8 +89,8 @@ func parseUrl(r *http.Request) (map[string][]string, error) {
 		return nil, fmt.Errorf("url params are missing")
 	}
 
-	for k, v := range urlParams {
-		fmt.Printf( "Url Param %s is %v: ", k, string(v[0]))
+	for k := range urlParams {
+		//fmt.Printf( "Url Param %s is %v: ", k, string(v[0]))
 		_, exists := expectedKeys[k] 
 		if !exists {
 			return nil, fmt.Errorf("field %s does not exist", k)
@@ -101,8 +106,14 @@ func parseUrl(r *http.Request) (map[string][]string, error) {
 }
 
 func sendSlackMessage(token string, text string, authorID string, channel string) {
-	api := slack.New(token)
-	channelID, timestamp, err := api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
+	var channelID, timestamp string
+	var err error
+	if token == "Iamafaketoken" {
+
+	} else {
+		api := slack.New(token)
+		channelID, timestamp, err = api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
+	}
 	if err != nil {
 		fmt.Printf("%s\n", err)
 		return

@@ -1,6 +1,7 @@
 package nps
 
 import (
+	"fmt"
 	"log"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,7 @@ func TestFindBlankEnvVars(t *testing.T) {
 		require.NotEqual(t, "DevMode", b)
 	}
 }
+
 // test that response contains the correct fields
 func TestHandlerMissingEnvVars(t *testing.T) {
 	w := httptest.NewRecorder()
@@ -32,13 +34,14 @@ func TestHandlerSendSlackMessage(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil))
-	require.Equal(t, 200, w.Result().StatusCode)
-
+	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&score=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
+	//require.Equal(t, 200, w.Result().StatusCode)
+	t.Fail()
 }
 
 func TestParseUrl(t *testing.T) {
-	_, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&score=10&email=matt@smith.test&website=mattsmith.test", nil))
+	urlString, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&score=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
+	fmt.Println(urlString)
 	if err != nil {
 		log.Println(err)
 		t.Fail()

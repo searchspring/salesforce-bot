@@ -14,14 +14,22 @@
   },
   "builds": [
     {
-      "src": "api/index.go",
+      "src": "api/slack/index.go",
+      "use": "@vercel/go"
+    }, 
+    {
+      "src": "api/nps/index.go", 
       "use": "@vercel/go"
     }
   ],
   "routes": [
     {
       "src": "/",
-      "dest": "/api"
+      "dest": "/api/slack"
+    }, 
+    {
+      "src": "/nps",
+      "dest": "/api/nps"
     }
   ]
 }

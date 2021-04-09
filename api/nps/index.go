@@ -61,13 +61,18 @@ func (s *SlackDAOReal) getValues() []string {
 }
 
 func (s *SlackDAOReal) sendSlackMessage(token string, text string, authorID string, channel string) error {
+	fmt.Println("3")
 	api := slack.New(token)
+	fmt.Println("4")
 	channelID, timestamp, err := api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
+	fmt.Println("5")
+	fmt.Println("Err: ", err)
 	if err != nil {
 		return err
 	}
+	fmt.Println("6")
 	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
-	return err
+	return nil
 }
 
 // Handler - check routing and call correct methods
@@ -97,16 +102,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sendInternalServerError(w, err)
 		return
 	}
-	fmt.Fprint(w, urlMap)
+	fmt.Println(urlMap)
 
 	if _, exists := urlMap["test"]; exists {
 		slackDAO = &SlackDAOFake{}
 	} else {
 		slackDAO = &SlackDAOReal{}
 	}
-
+	fmt.Println("Dao", slackDAO)
 	err = slackDAO.sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+	fmt.Println("2")
 	if err != nil {
+		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
 	}
 

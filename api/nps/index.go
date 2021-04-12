@@ -37,7 +37,7 @@ type envVars struct {
 }
 
 type SlackDAO interface {
-	sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error
+	sendSlackMessage(token string, attachments slack.Attachment, authorID string, channel string) error
 	getValues() []string
 }
 
@@ -48,9 +48,9 @@ type SlackDAOReal struct{}
 
 var slackDAO SlackDAO = nil
 
-func (s *SlackDAOFake) sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error {
+func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, authorID string, channel string) error {
 
-	s.Recorded = []string{token, text, authorID, channel}
+	s.Recorded = []string{token, authorID, channel}
 	return nil
 }
 
@@ -62,11 +62,10 @@ func (s *SlackDAOReal) getValues() []string {
 	return []string{"", ""}
 }
 
-func (s *SlackDAOReal) sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error {
+func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachment, authorID string, channel string) error {
 	api := slack.New(token)
 	channelID, timestamp, err := api.PostMessage(
 		channel,
-		//slack.MsgOptionText("<@"+authorID+"> requests: "+text, false), 
 		slack.MsgOptionAttachments(attachments))
 	if err != nil {
 		return err
@@ -116,7 +115,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = slackDAO.sendSlackMessage(env.SlackOauthToken, "", attachments, "U01R5TH2DK4", "C01TWG8D6CC")
+	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, "U01R5TH2DK4", "C01TWG8D6CC")
 	if err != nil {
 		fmt.Println(err.Error())
 		sendInternalServerError(w, err)

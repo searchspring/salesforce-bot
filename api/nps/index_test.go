@@ -34,12 +34,12 @@ func TestHandlerSendSlackMessage(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&score=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
+	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
 	require.Equal(t, []string{"", "Test", "U01R5TH2DK4", "C01TWG8D6CC"}, slackDAO.getValues())
 }
 
 func TestParseUrl(t *testing.T) {
-	urlString, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&score=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
+	urlString, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&email=matt@smith.test&website=mattsmith.test&feedback=Perfect&test=true", nil))
 	fmt.Println(urlString)
 	if err != nil {
 		log.Println(err)

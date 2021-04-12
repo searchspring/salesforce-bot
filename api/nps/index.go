@@ -6,6 +6,7 @@ import (
 	//"errors"
 	"fmt"
 	"log"
+	"strconv"
 
 	//"math/rand"
 	"net/http"
@@ -34,9 +35,17 @@ type envVars struct {
 	NxPassword             string `split_words:"true" required:"false"`
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
 }
+type slackAttachment struct {
+	Text string
+}
+
+type slackMessage struct {
+	Text string
+	Attachments []slackAttachment
+}
 
 type SlackDAO interface {
-	sendSlackMessage(token string, text string, authorID string, channel string) error
+	sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error
 	getValues() []string
 }
 
@@ -47,7 +56,7 @@ type SlackDAOReal struct{}
 
 var slackDAO SlackDAO = nil
 
-func (s *SlackDAOFake) sendSlackMessage(token string, text string, authorID string, channel string) error {
+func (s *SlackDAOFake) sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error {
 
 	s.Recorded = []string{token, text, authorID, channel}
 	return nil
@@ -61,9 +70,12 @@ func (s *SlackDAOReal) getValues() []string {
 	return []string{"", ""}
 }
 
-func (s *SlackDAOReal) sendSlackMessage(token string, text string, authorID string, channel string) error {
+func (s *SlackDAOReal) sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error {
 	api := slack.New(token)
-	channelID, timestamp, err := api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
+	channelID, timestamp, err := api.PostMessage(
+		channel,
+		//slack.MsgOptionText("<@"+authorID+"> requests: "+text, false), 
+		slack.MsgOptionAttachments(attachments))
 	if err != nil {
 		return err
 	}
@@ -105,16 +117,77 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		slackDAO = &SlackDAOReal{}
 	}
-	err = slackDAO.sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
+
+	attachments, err := createSlackAttachment(urlMap)
+	if err != nil {
+		sendInternalServerError(w, err)
+		return
+	}
+
+	err = slackDAO.sendSlackMessage(env.SlackOauthToken, "", attachments, "U01R5TH2DK4", "C01TWG8D6CC")
 	if err != nil {
 		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
+		return
 	}
 
 }
 
+func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error) {
+	attachments := slack.Attachment{
+		AuthorName: "New NPS Rating",
+		AuthorIcon: "https://avatars.slack-edge.com/2020-01-08/900543610438_6d658dd2df4b32187c53_512.png",
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Name",
+				Value: urlMap["name"][0],
+				Short: true,
+			},
+			{
+				Title: "Website",
+				Value: urlMap["website"][0],
+				Short: true,
+			},
+			{
+				Title: "Email",
+				Value: urlMap["email"][0],
+				Short: true,
+			},
+		},
+	}
+	newField := slack.AttachmentField{}
+	if _, exists := urlMap["rating"]; exists {
+		newField = slack.AttachmentField{
+			Title: "Rating",
+			Value: urlMap["rating"][0],
+			Short: true,
+		}
+
+		i, err := strconv.Atoi(urlMap["rating"][0]) 
+		if err != nil {
+			return slack.Attachment{}, err 
+		}
+		if i > 8 {
+			attachments.Color = "#35a64f"
+		} else if i > 6 && i <= 8 {
+			attachments.Color = "#b8ba31"
+		} else {
+			attachments.Color = "#eb0101"
+		}
+	} else if _, exists := urlMap["feedback"]; exists {
+		newField = slack.AttachmentField{
+			Title: "Feedback",
+			Value: urlMap["feedback"][0],
+			Short: true,
+		}
+	}
+	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
+
+	return attachments, nil
+}
+
 func parseUrl(r *http.Request) (map[string][]string, error) {
-	expectedKeys := map[string]bool{"score": false, "name": false, "email": false, "website": false, "test": true}
+	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false, "test": true}
 	u, err := url.Parse(r.URL.String())
 
 	if err != nil {

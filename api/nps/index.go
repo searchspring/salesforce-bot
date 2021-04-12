@@ -35,14 +35,6 @@ type envVars struct {
 	NxPassword             string `split_words:"true" required:"false"`
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
 }
-type slackAttachment struct {
-	Text string
-}
-
-type slackMessage struct {
-	Text string
-	Attachments []slackAttachment
-}
 
 type SlackDAO interface {
 	sendSlackMessage(token string, text string, attachments slack.Attachment, authorID string, channel string) error

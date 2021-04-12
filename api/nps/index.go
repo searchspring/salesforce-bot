@@ -48,6 +48,7 @@ type SlackDAOReal struct{}
 var slackDAO SlackDAO = nil
 
 func (s *SlackDAOFake) sendSlackMessage(token string, text string, authorID string, channel string) error {
+
 	s.Recorded = []string{token, text, authorID, channel}
 	return nil
 }
@@ -61,16 +62,11 @@ func (s *SlackDAOReal) getValues() []string {
 }
 
 func (s *SlackDAOReal) sendSlackMessage(token string, text string, authorID string, channel string) error {
-	fmt.Println("3")
 	api := slack.New(token)
-	fmt.Println("4")
 	channelID, timestamp, err := api.PostMessage(channel, slack.MsgOptionText("<@"+authorID+"> requests: "+text, false))
-	fmt.Println("5")
-	fmt.Println("Err: ", err)
 	if err != nil {
 		return err
 	}
-	fmt.Println("6")
 	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
 	return nil
 }
@@ -109,9 +105,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		slackDAO = &SlackDAOReal{}
 	}
-	fmt.Println("Dao", slackDAO)
 	err = slackDAO.sendSlackMessage(env.SlackOauthToken, "Test", "U01R5TH2DK4", "C01TWG8D6CC")
-	fmt.Println("2")
 	if err != nil {
 		fmt.Println(err.Error())
 		sendInternalServerError(w, err)

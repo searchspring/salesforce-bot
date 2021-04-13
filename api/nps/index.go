@@ -19,6 +19,7 @@ import (
 	//petname "github.com/dustinkirkland/golang-petname"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
+	"github.com/searchspring/nebo/salesforce"
 	//"github.com/searchspring/nebo/nextopia"
 	//"github.com/searchspring/nebo/salesforce"
 )
@@ -74,6 +75,8 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 	return nil
 }
 
+var salesForceDAO salesforce.DAO = nil
+
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
 
@@ -108,6 +111,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		slackDAO = &SlackDAOReal{}
 	}
+
+	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
+
+	responseData, err := salesForceDAO.NPSQuery(urlMap["name"][0])
+	if err != nil {
+		sendInternalServerError(w, err)
+		return
+	}
+	fmt.Println(&responseData)
+
 
 	attachments, err := createSlackAttachment(urlMap)
 	if err != nil {

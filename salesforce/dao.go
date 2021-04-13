@@ -50,6 +50,8 @@ type DAO interface {
 	Query(query string) ([]byte, error)
 	IDQuery(query string) ([]byte, error)
 	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
+	NPSQuery(query string) ([]*accountInfo, error)
+	StructFromResult(query string, result *simpleforce.QueryResult) ([]*accountInfo, error)
 }
 
 // DAOImpl defines the properties of the DAO
@@ -182,6 +184,60 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 	accounts = truncateAccounts(accounts)
 	msg := formatAccountInfos(accounts, search)
 	return json.Marshal(msg)
+}
+
+// nps functions
+func (s *DAOImpl) NPSQuery(search string) ([]*accountInfo, error) {
+	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
+	if err != nil {
+		return nil, err
+	}
+
+	sanitized := reg.ReplaceAllString(search, "")
+
+	q := "SELECT " + selectFields + " " +
+		"FROM Account WHERE Type IN ('Customer', 'Inactive Customer') " +
+		"AND (Website LIKE '%" + sanitized + "%' OR Platform__c LIKE '%" + sanitized +
+		"%' OR Tracking_Code__c = '" + sanitized + "') ORDER BY Chargify_MRR__c DESC"
+	result, err := s.Client.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	return s.StructFromResult(sanitized, result)
+}
+
+func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*accountInfo, error) {
+	accounts := []*accountInfo{}
+	for _, record := range result.Records {
+		manager := record["CS_Manager__r"]
+		managerName := "unknown"
+		if manager != nil {
+			if mapName, ok := (manager.(map[string]interface{}))["Name"]; ok {
+				managerName = fmt.Sprintf("%s", mapName)
+			}
+		}
+		Type := record["Type"]
+		active := "Active"
+		if Type != "Customer" {
+			active = "Not active"
+		}
+		mrr := float64(-1)
+		if record["Chargify_MRR__c"] != nil {
+			mrr = record["Chargify_MRR__c"].(float64)
+		}
+
+		accounts = append(accounts, &accountInfo{
+			Manager:     managerName,
+			Active:      active,
+			MRR:         mrr,
+		})
+	}
+	accounts = cleanAccounts(accounts)
+	if !isPlatformSearch(search) {
+		accounts = sortAccounts(accounts)
+	}
+	accounts = truncateAccounts(accounts)
+	return accounts, nil
 }
 
 func truncateAccounts(accounts []*accountInfo) []*accountInfo {

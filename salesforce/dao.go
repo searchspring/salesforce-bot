@@ -31,7 +31,7 @@ var Platforms = []string{
 	"Yahoo",
 }
 
-type accountInfo struct {
+type AccountInfo struct {
 	Website     string
 	Manager     string
 	Active      string
@@ -50,8 +50,8 @@ type DAO interface {
 	Query(query string) ([]byte, error)
 	IDQuery(query string) ([]byte, error)
 	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
-	NPSQuery(query string) ([]*accountInfo, error)
-	StructFromResult(query string, result *simpleforce.QueryResult) ([]*accountInfo, error)
+	NPSQuery(query string) ([]*AccountInfo, error)
+	StructFromResult(query string, result *simpleforce.QueryResult) ([]*AccountInfo, error)
 }
 
 // DAOImpl defines the properties of the DAO
@@ -118,7 +118,7 @@ func (s *DAOImpl) IDQuery(search string) ([]byte, error) {
 }
 
 func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {
-	accounts := []*accountInfo{}
+	accounts := []*AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -163,7 +163,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			state = fmt.Sprintf("%s", record["BillingState"])
 		}
 
-		accounts = append(accounts, &accountInfo{
+		accounts = append(accounts, &AccountInfo{
 			Website:     fmt.Sprintf("%s", record["Website"]),
 			Manager:     fmt.Sprintf("%s", managerName),
 			Active:      fmt.Sprintf("%s", active),
@@ -187,7 +187,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 }
 
 // nps functions
-func (s *DAOImpl) NPSQuery(search string) ([]*accountInfo, error) {
+func (s *DAOImpl) NPSQuery(search string) ([]*AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -206,8 +206,8 @@ func (s *DAOImpl) NPSQuery(search string) ([]*accountInfo, error) {
 	return s.StructFromResult(sanitized, result)
 }
 
-func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*accountInfo, error) {
-	accounts := []*accountInfo{}
+func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*AccountInfo, error) {
+	accounts := []*AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -226,10 +226,16 @@ func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResul
 			mrr = record["Chargify_MRR__c"].(float64)
 		}
 
-		accounts = append(accounts, &accountInfo{
+		familymrr := float64(-1)
+		if record["Family_MRR__c"] != nil {
+			familymrr = record["Family_MRR__c"].(float64)
+		}
+
+		accounts = append(accounts, &AccountInfo{
 			Manager:     managerName,
 			Active:      active,
 			MRR:         mrr,
+			FamilyMRR:   familymrr,
 		})
 	}
 	accounts = cleanAccounts(accounts)
@@ -240,8 +246,8 @@ func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResul
 	return accounts, nil
 }
 
-func truncateAccounts(accounts []*accountInfo) []*accountInfo {
-	truncated := []*accountInfo{}
+func truncateAccounts(accounts []*AccountInfo) []*AccountInfo {
+	truncated := []*AccountInfo{}
 	for i, account := range accounts {
 		if i == 20 {
 			break
@@ -260,7 +266,7 @@ func isPlatformSearch(search string) bool {
 }
 
 // example formatting here: https://api.slack.com/reference/messaging/attachments
-func formatAccountInfos(accountInfos []*accountInfo, search string) *slack.Msg {
+func formatAccountInfos(accountInfos []*AccountInfo, search string) *slack.Msg {
 	initialText := "Reps for search: " + search
 	if len(accountInfos) == 0 {
 		initialText = "No results for: " + search
@@ -298,7 +304,7 @@ func formatAccountInfos(accountInfos []*accountInfo, search string) *slack.Msg {
 	return msg
 }
 
-func cleanAccounts(accounts []*accountInfo) []*accountInfo {
+func cleanAccounts(accounts []*AccountInfo) []*AccountInfo {
 	for _, account := range accounts {
 		w := account.Website
 		if strings.HasPrefix(w, "http://") || strings.HasPrefix(w, "https://") {
@@ -314,7 +320,7 @@ func cleanAccounts(accounts []*accountInfo) []*accountInfo {
 	}
 	return accounts
 }
-func sortAccounts(accounts []*accountInfo) []*accountInfo {
+func sortAccounts(accounts []*AccountInfo) []*AccountInfo {
 	sort.Slice(accounts, func(i, j int) bool {
 		return len(accounts[i].Website) < len(accounts[j].Website)
 	})

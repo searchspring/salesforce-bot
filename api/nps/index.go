@@ -119,10 +119,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sendInternalServerError(w, err)
 		return
 	}
-	fmt.Println(&responseData)
 
 
-	attachments, err := createSlackAttachment(urlMap)
+	attachments, err := createSlackAttachment(urlMap, responseData)
 	if err != nil {
 		sendInternalServerError(w, err)
 		return
@@ -137,7 +136,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error) {
+func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
 	attachments := slack.Attachment{
 		AuthorName: "New NPS Rating",
 		AuthorIcon: "https://avatars.slack-edge.com/2020-01-08/900543610438_6d658dd2df4b32187c53_512.png",
@@ -155,6 +154,16 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 			{
 				Title: "Email",
 				Value: urlMap["email"][0],
+				Short: true,
+			},
+			{
+				Title: "FamilyMRR",
+				Value: "$" + strconv.Itoa(int(salesforceData[0].FamilyMRR)),
+				Short: true,
+			},
+			{
+				Title: "Manager",
+				Value: salesforceData[0].Manager,
 				Short: true,
 			},
 		},
@@ -176,6 +185,7 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 		} else if i > 6 && i <= 8 {
 			attachments.Color = "#b8ba31"
 		} else {
+			//getUserIdFromName(salesforceData[0].Manager, token)
 			attachments.Color = "#eb0101"
 		}
 	} else if _, exists := urlMap["feedback"]; exists {
@@ -189,6 +199,19 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 
 	return attachments, nil
 }
+
+/*
+func getUserIdFromName(username string, token string) (int, error) {
+	api := slack.New(token)
+	user, err := api.GetUserIdentity()
+	if err != nil {
+		fmt.Println(err.Error())
+		return -1, err
+	}
+	fmt.Println(user)
+	return 0 , nil
+}
+*/
 
 func parseUrl(r *http.Request) (map[string][]string, error) {
 	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false, "test": true}

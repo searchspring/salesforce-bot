@@ -35,7 +35,7 @@ func TestHandlerSendSlackMessage(t *testing.T) {
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
 	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
-	require.Equal(t, []string{"", "C01TWG8D6CC"}, slackDAO.getValues())
+	require.Equal(t, []string{"", ""}, slackDAO.getValues())
 }
 
 func TestParseUrl(t *testing.T) {

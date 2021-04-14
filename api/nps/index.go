@@ -182,11 +182,14 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 		}
 		if i > 8 {
 			attachments.Color = "#35a64f"
+			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/glowing-star_1f31f.png"
 		} else if i > 6 && i <= 8 {
 			attachments.Color = "#b8ba31"
+			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/neutral-face_1f610.png"
 		} else {
 			//getUserIdFromName(salesforceData[0].Manager, token)
 			attachments.Color = "#eb0101"
+			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/pile-of-poo_1f4a9.png"
 		}
 	} else if _, exists := urlMap["feedback"]; exists {
 		newField = slack.AttachmentField{

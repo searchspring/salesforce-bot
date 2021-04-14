@@ -1,26 +1,16 @@
 package nps
 
 import (
-	//"bytes"
-	//"encoding/json"
-	//"errors"
 	"fmt"
 	"log"
 	"strconv"
-
-	//"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 
-	//"time"
-
-	//petname "github.com/dustinkirkland/golang-petname"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-	//"github.com/searchspring/nebo/nextopia"
-	//"github.com/searchspring/nebo/salesforce"
 )
 
 type envVars struct {
@@ -102,7 +92,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sendInternalServerError(w, err)
 		return
 	}
-	fmt.Println(urlMap)
 
 	if _, exists := urlMap["test"]; exists {
 		slackDAO = &SlackDAOFake{}
@@ -126,6 +115,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error) {
+	red := "#eb0101"
+	yellow := "#b8ba31"
+	green := "#35a64f"
 	attachments := slack.Attachment{
 		AuthorName: "New NPS Rating",
 		AuthorIcon: "https://avatars.slack-edge.com/2020-01-08/900543610438_6d658dd2df4b32187c53_512.png",
@@ -160,11 +152,11 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 			return slack.Attachment{}, err 
 		}
 		if i > 8 {
-			attachments.Color = "#35a64f"
+			attachments.Color = green
 		} else if i > 6 && i <= 8 {
-			attachments.Color = "#b8ba31"
+			attachments.Color = yellow
 		} else {
-			attachments.Color = "#eb0101"
+			attachments.Color = red
 		}
 	} else if _, exists := urlMap["feedback"]; exists {
 		newField = slack.AttachmentField{
@@ -193,7 +185,6 @@ func parseUrl(r *http.Request) (map[string][]string, error) {
 	}
 
 	for k := range urlParams {
-		//fmt.Printf( "Url Param %s is %v: ", k, string(v[0]))
 		_, exists := expectedKeys[k]
 		if !exists {
 			return nil, fmt.Errorf("field %s does not exist", k)

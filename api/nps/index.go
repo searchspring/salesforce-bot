@@ -3,10 +3,11 @@ package nps
 import (
 	"fmt"
 	"log"
-	"strconv"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
@@ -17,7 +18,6 @@ type envVars struct {
 	DevMode                string `split_words:"true" required:"false"`
 	SlackVerificationToken string `split_words:"true" required:"false"`
 	SlackOauthToken        string `split_words:"true" required:"false"`
-	SlackChannelID         string `split_words:"true" required:"false"`
 	SfURL                  string `split_words:"true" required:"false"`
 	SfUser                 string `split_words:"true" required:"false"`
 	SfPassword             string `split_words:"true" required:"false"`
@@ -105,7 +105,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, env.SlackChannelID)
+	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
 	if err != nil {
 		fmt.Println(err.Error())
 		sendInternalServerError(w, err)

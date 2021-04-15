@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 
@@ -29,7 +30,7 @@ type envVars struct {
 }
 
 type SlackDAO interface {
-	sendSlackMessage(token string, attachments slack.Attachment, authorID string, channel string) error
+	sendSlackMessage(token string, attachments slack.Attachment, channel string) error
 	getValues() []string
 }
 
@@ -40,9 +41,9 @@ type SlackDAOReal struct{}
 
 var slackDAO SlackDAO = nil
 
-func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, authorID string, channel string) error {
+func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
 
-	s.Recorded = []string{token, authorID, channel}
+	s.Recorded = []string{token, channel}
 	return nil
 }
 
@@ -54,7 +55,7 @@ func (s *SlackDAOReal) getValues() []string {
 	return []string{"", ""}
 }
 
-func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachment, authorID string, channel string) error {
+func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
 	api := slack.New(token)
 	channelID, timestamp, err := api.PostMessage(
 		channel,
@@ -95,7 +96,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sendInternalServerError(w, err)
 		return
 	}
-	fmt.Println(urlMap)
 
 	if _, exists := urlMap["test"]; exists {
 		slackDAO = &SlackDAOFake{}
@@ -118,7 +118,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, "U01R5TH2DK4", "C01TWG8D6CC")
+	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
 	if err != nil {
 		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
@@ -128,6 +128,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
+	red := "#eb0101"
+	yellow := "#b8ba31"
+	green := "#35a64f"
 	attachments := slack.Attachment{
 		AuthorName: "New NPS Rating",
 		AuthorIcon: "https://avatars.slack-edge.com/2020-01-08/900543610438_6d658dd2df4b32187c53_512.png",
@@ -172,14 +175,13 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			return slack.Attachment{}, err 
 		}
 		if i > 8 {
-			attachments.Color = "#35a64f"
+			attachments.Color = green
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/glowing-star_1f31f.png"
 		} else if i > 6 && i <= 8 {
-			attachments.Color = "#b8ba31"
+			attachments.Color = yellow
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/neutral-face_1f610.png"
 		} else {
-			//getUserIdFromName(salesforceData[0].Manager, token)
-			attachments.Color = "#eb0101"
+			attachments.Color = red
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/pile-of-poo_1f4a9.png"
 		}
 	} else if _, exists := urlMap["feedback"]; exists {
@@ -222,7 +224,6 @@ func parseUrl(r *http.Request) (map[string][]string, error) {
 	}
 
 	for k := range urlParams {
-		//fmt.Printf( "Url Param %s is %v: ", k, string(v[0]))
 		_, exists := expectedKeys[k]
 		if !exists {
 			return nil, fmt.Errorf("field %s does not exist", k)

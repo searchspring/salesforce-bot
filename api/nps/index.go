@@ -80,6 +80,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("Env Vars: ", env)
+
 	blanks := findBlankEnvVars(env)
 	if len(blanks) > 0 {
 		err := fmt.Errorf("the following env vars are blank: %s", strings.Join(blanks, ", "))

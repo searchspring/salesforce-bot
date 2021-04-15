@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	//"time"
-	//"github.com/stretchr/testify/require"
 )
 
 func TestFindBlankEnvVars(t *testing.T) {

@@ -1,27 +1,18 @@
 package nps
 
 import (
-	//"bytes"
-	//"encoding/json"
-	//"errors"
 	"fmt"
 	"log"
 	"strconv"
-
-	//"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 
-	//"time"
-
-	//petname "github.com/dustinkirkland/golang-petname"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
-	//"github.com/searchspring/nebo/nextopia"
-	//"github.com/searchspring/nebo/salesforce"
+
 )
 
 type envVars struct {

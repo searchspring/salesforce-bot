@@ -152,7 +152,7 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			},
 			{
 				Title: "FamilyMRR",
-				Value: "$" + strconv.Itoa(int(salesforceData[0].FamilyMRR)),
+				Value: "$" + formatInt(int(salesforceData[0].FamilyMRR)),
 				Short: true,
 			},
 			{
@@ -196,18 +196,18 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 	return attachments, nil
 }
 
-/*
-func getUserIdFromName(username string, token string) (int, error) {
-	api := slack.New(token)
-	user, err := api.GetUserIdentity()
-	if err != nil {
-		fmt.Println(err.Error())
-		return -1, err
-	}
-	fmt.Println(user)
-	return 0 , nil
+func formatInt(number int) string {
+    output := strconv.Itoa(number)
+    startOffset := 3
+    if number < 0 {
+        startOffset++
+    }
+    for outputIndex := len(output); outputIndex > startOffset; {
+        outputIndex -= 3
+        output = output[:outputIndex] + "," + output[outputIndex:]
+    }
+    return output
 }
-*/
 
 func parseUrl(r *http.Request) (map[string][]string, error) {
 	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false, "test": true}

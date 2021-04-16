@@ -87,12 +87,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
-	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOReal{})).Methods(http.MethodGet)
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOReal{})).Methods(http.MethodGet, http.MethodOptions)
+	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
 
 func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi SlackDAO), slackApi SlackDAO) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			return
+		}
 		apiRequest(w, r, slackApi)
 	}
 }
@@ -208,7 +213,6 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 		newField = slack.AttachmentField{
 			Title: "Feedback",
 			Value: urlMap["feedback"][0],
-			Short: true,
 		}
 	}
 	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)

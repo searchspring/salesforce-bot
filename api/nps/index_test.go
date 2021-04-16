@@ -23,7 +23,7 @@ func TestFindBlankEnvVars(t *testing.T) {
 // test that response contains the correct fields
 func TestHandlerMissingEnvVars(t *testing.T) {
 	w := httptest.NewRecorder()
-	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil))
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil), &SlackDAOFake{})
 	require.Equal(t, 500, w.Result().StatusCode)
 
 }
@@ -32,7 +32,7 @@ func TestHandlerSendSlackMessage(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test&test=true", nil))
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test&test=true", nil), &SlackDAOFake{})
 	require.Equal(t, []string{"", ""}, slackDAO.getValues())
 }
 

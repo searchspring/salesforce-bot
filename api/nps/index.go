@@ -87,21 +87,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
-	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage)).Methods(http.MethodPost)
-	fmt.Println("Router: ", )
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOReal{})).Methods(http.MethodGet)
 	return router, nil
 }
 
-func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, test bool)) func(w http.ResponseWriter, r *http.Request) {
+func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi SlackDAO), slackApi SlackDAO) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		test := false
-		apiRequest(w, r, test)
+		apiRequest(w, r, slackApi)
 	}
 }
 
-// Handler - check routing and call correct methods
-func SendNPSMessage(w http.ResponseWriter, r *http.Request, test bool) {
-	fmt.Fprintln(w, r)
+func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
+
 	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
@@ -127,12 +124,6 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, test bool) {
 		return
 	}
 
-	if test {
-		slackDAO = &SlackDAOFake{}
-	} else {
-		slackDAO = &SlackDAOReal{}
-	}
-
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
 
 	responseData, err := salesForceDAO.NPSQuery(urlMap["name"][0])
@@ -148,7 +139,7 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, test bool) {
 		return
 	}
 
-	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
+	err = slackApi.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
 	if err != nil {
 		fmt.Println(err.Error())
 		sendInternalServerError(w, err)

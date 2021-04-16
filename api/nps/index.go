@@ -3,17 +3,17 @@ package nps
 import (
 	"fmt"
 	"log"
-	"strconv"
 	"net/http"
 	"net/url"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
-
 )
 
 type envVars struct {
@@ -69,9 +69,39 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 
 var salesForceDAO salesforce.DAO = nil
 
+var router *mux.Router
+
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.Method, r.URL.Path)
+	if router == nil {
+		r, err := CreateRouter()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		router = r
+	}
+	router.ServeHTTP(w, r)
+}
 
+func CreateRouter() (*mux.Router, error) {
+	router := mux.NewRouter()
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage)).Methods(http.MethodPost)
+	fmt.Println("Router: ", )
+	return router, nil
+}
+
+func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, test bool)) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		test := false
+		apiRequest(w, r, test)
+	}
+}
+
+// Handler - check routing and call correct methods
+func SendNPSMessage(w http.ResponseWriter, r *http.Request, test bool) {
+	fmt.Fprintln(w, r)
 	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
@@ -97,7 +127,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, exists := urlMap["test"]; exists {
+	if test {
 		slackDAO = &SlackDAOFake{}
 	} else {
 		slackDAO = &SlackDAOReal{}
@@ -124,7 +154,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sendInternalServerError(w, err)
 		return
 	}
-
 }
 
 func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {

@@ -176,12 +176,12 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 				Short: true,
 			},
 			{
-				Title: "FamilyMRR",
+				Title: "Family MRR",
 				Value: "$" + formatInt(int(salesforceData[0].FamilyMRR)),
 				Short: true,
 			},
 			{
-				Title: "Manager",
+				Title: "Customer Success Manager",
 				Value: salesforceData[0].Manager,
 				Short: true,
 			},

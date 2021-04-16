@@ -162,7 +162,6 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 		newField = slack.AttachmentField{
 			Title: "Feedback",
 			Value: urlMap["feedback"][0],
-			Short: true,
 		}
 	}
 	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)

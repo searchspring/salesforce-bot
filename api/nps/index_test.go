@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http/httptest"
-	"os"
 	"testing"
+	"os"
 
 	"github.com/stretchr/testify/require"
 )
@@ -43,5 +43,4 @@ func TestParseUrl(t *testing.T) {
 		log.Println(err)
 		t.Fail()
 	}
-
 }

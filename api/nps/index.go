@@ -107,7 +107,6 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
-		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
 		return
 	}
@@ -119,11 +118,10 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 			sendInternalServerError(w, err)
 			return
 		}
-		log.Print(err.Error())
+		log.Println(err.Error())
 	}
 
 	urlMap, err := parseUrl(r)
-
 	if err != nil {
 		sendInternalServerError(w, err)
 		return
@@ -146,7 +144,6 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 
 	err = slackApi.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
 	if err != nil {
-		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
 		return
 	}
@@ -214,9 +211,14 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			Title: "Feedback",
 			Value: urlMap["feedback"][0],
 		}
+	} else {
+		newField = slack.AttachmentField{
+			Title: "Error",
+			Value: "No rating or feedback was given",
+		}
 	}
-	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 
+	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 	return attachments, nil
 }
 
@@ -234,7 +236,7 @@ func formatInt(number int) string {
 }
 
 func parseUrl(r *http.Request) (map[string][]string, error) {
-	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false, "test": true}
+	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false}
 	u, err := url.Parse(r.URL.String())
 
 	if err != nil {

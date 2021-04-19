@@ -20,24 +20,22 @@ func TestFindBlankEnvVars(t *testing.T) {
 	}
 }
 
-// test that response contains the correct fields
 func TestHandlerMissingEnvVars(t *testing.T) {
 	w := httptest.NewRecorder()
 	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil), &SlackDAOFake{})
 	require.Equal(t, 500, w.Result().StatusCode)
-
 }
 
 func TestHandlerSendSlackMessage(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test&test=true", nil), &SlackDAOFake{})
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test", nil), &SlackDAOFake{})
 	require.Equal(t, []string{"", ""}, slackDAO.getValues())
 }
 
 func TestParseUrl(t *testing.T) {
-	urlString, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&email=matt@smith.test&website=mattsmith.test&feedback=Perfect&test=true", nil))
+	urlString, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&email=matt@smith.test&website=mattsmith.test&feedback=Perfect", nil))
 	fmt.Println(urlString)
 	if err != nil {
 		log.Println(err)

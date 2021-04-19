@@ -39,10 +39,7 @@ type SlackDAOFake struct {
 }
 type SlackDAOReal struct{}
 
-var slackDAO SlackDAO = nil
-
 func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
-
 	s.Recorded = []string{token, channel}
 	return nil
 }
@@ -71,7 +68,6 @@ var salesForceDAO salesforce.DAO = nil
 
 var router *mux.Router
 
-// Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.Method, r.URL.Path)
 	if router == nil {
@@ -103,7 +99,7 @@ func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, 
 }
 
 func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
-
+	
 	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
@@ -134,7 +130,6 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 		sendInternalServerError(w, err)
 		return
 	}
-
 
 	attachments, err := createSlackAttachment(urlMap, responseData)
 	if err != nil {

@@ -28,10 +28,11 @@ func TestHandlerMissingEnvVars(t *testing.T) {
 
 func TestHandlerSendSlackMessage(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
-	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test", nil), &SlackDAOFake{})
-	require.Equal(t, []string{"", ""}, slackDAO.getValues())
+	slack := &SlackDAOFake{}
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test", nil), slack)
+	require.Equal(t, []string{}, slack.getValues())
+	defer os.Setenv("DEV_MODE", "")
 }
 
 func TestParseUrl(t *testing.T) {

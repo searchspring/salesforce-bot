@@ -145,6 +145,11 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 }
 
 func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
+	mrr, rep := "No customer data found", "No customer data found"
+	if len(salesforceData) > 0 {
+		mrr = formatInt(int(salesforceData[0].FamilyMRR))
+		rep = salesforceData[0].Manager
+	} 
 	red := "#eb0101"
 	yellow := "#b8ba31"
 	green := "#35a64f"
@@ -169,12 +174,12 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			},
 			{
 				Title: "Family MRR",
-				Value: "$" + formatInt(int(salesforceData[0].FamilyMRR)),
+				Value: "$" + mrr,
 				Short: true,
 			},
 			{
 				Title: "Customer Success Manager",
-				Value: salesforceData[0].Manager,
+				Value: rep,
 				Short: true,
 			},
 		},

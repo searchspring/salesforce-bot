@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	//"time"
-	//"github.com/stretchr/testify/require"
 )
 
 func TestFindBlankEnvVars(t *testing.T) {
@@ -22,12 +20,10 @@ func TestFindBlankEnvVars(t *testing.T) {
 	}
 }
 
-// test that response contains the correct fields
 func TestHandlerMissingEnvVars(t *testing.T) {
 	w := httptest.NewRecorder()
 	Handler(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil))
 	require.Equal(t, 500, w.Result().StatusCode)
-
 }
 
 func TestHandlerSendSlackMessage(t *testing.T) {
@@ -45,5 +41,4 @@ func TestParseUrl(t *testing.T) {
 		log.Println(err)
 		t.Fail()
 	}
-
 }

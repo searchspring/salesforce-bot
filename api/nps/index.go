@@ -65,7 +65,6 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 	return nil
 }
 
-// Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
 
 	var env envVars
@@ -83,11 +82,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			sendInternalServerError(w, err)
 			return
 		}
-		log.Print(err.Error())
+		log.Println(err.Error())
 	}
 
 	urlMap, err := parseUrl(r)
-
 	if err != nil {
 		sendInternalServerError(w, err)
 		return
@@ -111,7 +109,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		sendInternalServerError(w, err)
 		return
 	}
-
 }
 
 func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error) {
@@ -163,9 +160,14 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 			Title: "Feedback",
 			Value: urlMap["feedback"][0],
 		}
+	} else {
+		newField = slack.AttachmentField{
+			Title: "Error",
+			Value: "No rating or feedback was given",
+		}
 	}
-	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 
+	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 	return attachments, nil
 }
 

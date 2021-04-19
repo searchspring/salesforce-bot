@@ -70,7 +70,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
-		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
 		return
 	}
@@ -105,7 +104,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
 	if err != nil {
-		fmt.Println(err.Error())
 		sendInternalServerError(w, err)
 		return
 	}

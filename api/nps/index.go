@@ -125,7 +125,8 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
 
-	responseData, err := salesForceDAO.NPSQuery(urlMap["name"][0])
+	query := strings.Split(urlMap["website"][0], " ")[0]
+	responseData, err := salesForceDAO.NPSQuery(query)
 	if err != nil {
 		sendInternalServerError(w, err)
 		return

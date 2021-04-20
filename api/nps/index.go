@@ -64,43 +64,10 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 	return nil
 }
 
-var salesForceDAO salesforce.DAO = nil
-
 var router *mux.Router
+var env envVars
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method, r.URL.Path)
-	if router == nil {
-		r, err := CreateRouter()
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		router = r
-	}
-	router.ServeHTTP(w, r)
-}
-
-func CreateRouter() (*mux.Router, error) {
-	router := mux.NewRouter()
-	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOReal{})).Methods(http.MethodGet, http.MethodOptions)
-	router.Use(mux.CORSMethodMiddleware(router))
-	return router, nil
-}
-
-func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi SlackDAO), slackApi SlackDAO) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		if r.Method == http.MethodOptions {
-			return
-		}
-		apiRequest(w, r, slackApi)
-	}
-}
-
-func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
-	
-	var env envVars
 	err := envconfig.Process("", &env)
 	if err != nil {
 		sendInternalServerError(w, err)
@@ -117,16 +84,47 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 		log.Println(err.Error())
 	}
 
+	log.Println(r.Method, r.URL.Path)
+	if router == nil {
+		r, err := CreateRouter()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		router = r
+	}
+	router.ServeHTTP(w, r)
+}
+
+func CreateRouter() (*mux.Router, error) {
+	router := mux.NewRouter()
+	salesforceDAOReal := salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOReal{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	router.Use(mux.CORSMethodMiddleware(router))
+	return router, nil
+}
+
+func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceDAOReal salesforce.DAO), slackApi SlackDAO, salesforceDAOReal salesforce.DAO) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			return
+		}
+		apiRequest(w, r, slackApi, salesforceDAOReal)
+	}
+}
+
+func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceApi salesforce.DAO) {
+
 	urlMap, err := parseUrl(r)
 	if err != nil {
 		sendInternalServerError(w, err)
 		return
 	}
 
-	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-
+	fmt.Println("SF API: ", salesforceApi)
 	query := strings.Split(urlMap["website"][0], " ")[0]
-	responseData, err := salesForceDAO.NPSQuery(query)
+	responseData, err := salesforceApi.NPSQuery(query)
 	if err != nil {
 		sendInternalServerError(w, err)
 		return

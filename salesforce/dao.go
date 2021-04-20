@@ -52,11 +52,16 @@ type DAO interface {
 	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
 	NPSQuery(query string) ([]*AccountInfo, error)
 	StructFromResult(query string, result *simpleforce.QueryResult) ([]*AccountInfo, error)
+	GetSearchKey() string
 }
 
 // DAOImpl defines the properties of the DAO
 type DAOImpl struct {
 	Client *simpleforce.Client
+}
+
+type DAOfake struct {
+	searchKey string
 }
 
 const selectFields = "Type, Website, CS_Manager__r.Name, Family_MRR__c, Chargify_MRR__c, Platform__c, Integration_Type__c, Chargify_Source__c, Tracking_Code__c, BillingCity, BillingCountry, BillingState"
@@ -246,6 +251,10 @@ func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResul
 	return accounts, nil
 }
 
+func (s *DAOImpl) GetSearchKey() string {
+	return ""
+}
+
 func truncateAccounts(accounts []*AccountInfo) []*AccountInfo {
 	truncated := []*AccountInfo{}
 	for i, account := range accounts {
@@ -326,3 +335,21 @@ func sortAccounts(accounts []*AccountInfo) []*AccountInfo {
 	})
 	return accounts
 }
+
+// fakeDAO test functions
+func (s *DAOfake) NPSQuery(search string) ([]*AccountInfo, error) {
+	accounts := []*AccountInfo{}
+	account := &AccountInfo{Manager: search, Active: "active", MRR: 0, FamilyMRR: 0}
+	accounts = append(accounts, account)
+	s.searchKey = search
+	return accounts, nil
+}
+
+func (s *DAOfake) GetSearchKey() string {
+	return s.searchKey
+}
+
+func (s *DAOfake) StructFromResult(search string, result *simpleforce.QueryResult) ([]*AccountInfo, error) {return []*AccountInfo{}, nil}
+func (s *DAOfake) Query(search string) ([]byte, error) {return []byte{}, nil}
+func (s *DAOfake) IDQuery(search string) ([]byte, error) {return []byte{}, nil}
+func (s *DAOfake) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {return []byte{}, nil}

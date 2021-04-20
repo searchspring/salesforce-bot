@@ -145,9 +145,9 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO) {
 }
 
 func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
-	mrr, rep := "No customer data found", "No customer data found"
+	mrr, rep := "Unknown", "Unknown"
 	if len(salesforceData) > 0 {
-		mrr = formatInt(int(salesforceData[0].FamilyMRR))
+		mrr = "$" + formatInt(int(salesforceData[0].FamilyMRR))
 		rep = salesforceData[0].Manager
 	} 
 	red := "#eb0101"
@@ -174,7 +174,7 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			},
 			{
 				Title: "Family MRR",
-				Value: "$" + mrr,
+				Value: mrr,
 				Short: true,
 			},
 			{

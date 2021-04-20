@@ -208,11 +208,13 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/pile-of-poo_1f4a9.png"
 		}
 	} else if _, exists := urlMap["feedback"]; exists {
+		attachments.AuthorName = "New NPS Feedback"
 		newField = slack.AttachmentField{
 			Title: "Feedback",
 			Value: urlMap["feedback"][0],
 		}
 	} else {
+		attachments.AuthorName = "Error"
 		newField = slack.AttachmentField{
 			Title: "Error",
 			Value: "No rating or feedback was given",

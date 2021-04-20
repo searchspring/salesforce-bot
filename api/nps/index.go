@@ -14,6 +14,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
+	"github.com/dustin/go-humanize"
 )
 
 type envVars struct {
@@ -146,7 +147,7 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, s
 func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
 	mrr, rep := "Unknown", "Unknown"
 	if len(salesforceData) > 0 {
-		mrr = "$" + formatInt(int(salesforceData[0].FamilyMRR))
+		mrr = "$" + humanize.Comma(int64(salesforceData[0].FamilyMRR))
 		rep = salesforceData[0].Manager
 	} 
 	red := "#eb0101"
@@ -221,19 +222,6 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 
 	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 	return attachments, nil
-}
-
-func formatInt(number int) string {
-    output := strconv.Itoa(number)
-    startOffset := 3
-    if number < 0 {
-        startOffset++
-    }
-    for outputIndex := len(output); outputIndex > startOffset; {
-        outputIndex -= 3
-        output = output[:outputIndex] + "," + output[outputIndex:]
-    }
-    return output
 }
 
 func parseUrl(r *http.Request) (map[string][]string, error) {

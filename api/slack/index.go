@@ -52,7 +52,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			sendInternalServerError(w, err)
 			return
 		}
-		log.Printf(err.Error())
+		log.Print(err.Error())
 	}
 
 	s, err := slack.SlashCommandParse(r)

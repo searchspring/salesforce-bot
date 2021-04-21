@@ -6,44 +6,12 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"reflect"
 	"strings"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
+	common "github.com/searchspring/nebo/api/config"
 )
-
-type envVars struct {
-	DevMode                string `split_words:"true" required:"false"`
-	SlackVerificationToken string `split_words:"true" required:"false"`
-	SlackOauthToken        string `split_words:"true" required:"false"`
-}
-
-type SlackDAO interface {
-	sendSlackMessage(token string, attachments slack.Attachment, channel string) error
-	getValues() []string
-}
-
-type SlackDAOFake struct {
-	Recorded []string
-}
-type SlackDAOReal struct{}
-
-var slackDAO SlackDAO = nil
-
-func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
-
-	s.Recorded = []string{token, channel}
-	return nil
-}
-
-func (s *SlackDAOFake) getValues() []string {
-	return s.Recorded
-}
-
-func (s *SlackDAOReal) getValues() []string {
-	return []string{"", ""}
-}
 
 type ChallengeEvent struct {
 	Token     string `json:"token"`
@@ -59,6 +27,7 @@ type ChannelEvent struct {
 
 type Event struct {
 	Type    string  `json:"type"`
+	Token   string  `json:"token"`
 	Channel Channel `json:"channel"`
 }
 
@@ -67,28 +36,20 @@ type Channel struct {
 	ID   string `json:"id"`
 }
 
-func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
-	api := slack.New(token)
-	if _, _, err := api.PostMessage(channel, slack.MsgOptionAttachments(attachments)); err != nil {
-		return err
-	}
-	return nil
-}
-
 func Handler(w http.ResponseWriter, r *http.Request) {
-	slackDAO = &SlackDAOReal{}
-	var env envVars
+	slackDAO := &common.SlackDAOImpl{}
+	var env common.EnvVars
 	err := envconfig.Process("", &env)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	blanks := findBlankEnvVars(env)
+	blanks := common.FindBlankEnvVars(env)
 	if len(blanks) > 0 {
 		err := fmt.Errorf("the following env vars are blank: %s", strings.Join(blanks, ", "))
 		if env.DevMode != "development" {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		log.Println(err.Error())
@@ -100,11 +61,18 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event := &slack.Event{}
+	event := &Event{}
 	json.Unmarshal(body, event)
 	if event.Type == "url_verification" {
 		eventDetails := &ChallengeEvent{}
+		json.Unmarshal(body, eventDetails)
 		w.Write([]byte(eventDetails.Challenge))
+		return
+	}
+
+	if event.Token != env.SlackVerificationToken {
+		log.Printf("Error reading body: %v", err)
+		http.Error(w, "Invalid Verification Token", http.StatusBadRequest)
 		return
 	}
 
@@ -114,7 +82,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal(body, eventDetails)
 		fmt.Printf("Event received: %s\n", eventDetails.Event.Type)
 		if eventDetails.Event.Type == "channel_created" {
-			slackDAO.sendSlackMessage(env.SlackOauthToken, slack.Attachment{
+			slackDAO.SendSlackMessage(env.SlackOauthToken, slack.Attachment{
 				AuthorIcon: "https://emoji.slack-edge.com/T024FV14T/slack/7d462d2443.png",
 				AuthorName: "Slack Event",
 				Text:       fmt.Sprintf("New channel: <#%s>", eventDetails.Event.Channel.ID),
@@ -122,21 +90,4 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-}
-
-func sendInternalServerError(res http.ResponseWriter, err error) {
-	log.Println(err.Error())
-	http.Error(res, err.Error(), http.StatusInternalServerError)
-}
-
-func findBlankEnvVars(env envVars) []string {
-	var blanks []string
-	valueOfStruct := reflect.ValueOf(env)
-	typeOfStruct := valueOfStruct.Type()
-	for i := 0; i < valueOfStruct.NumField(); i++ {
-		if valueOfStruct.Field(i).Interface() == "" {
-			blanks = append(blanks, typeOfStruct.Field(i).Name)
-		}
-	}
-	return blanks
 }

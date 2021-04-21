@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -15,53 +14,29 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
+	"github.com/searchspring/nebo/api/config"
 )
 
-type envVars struct {
-	DevMode                string `split_words:"true" required:"false"`
-	SlackVerificationToken string `split_words:"true" required:"false"`
-	SlackOauthToken        string `split_words:"true" required:"false"`
-	SfURL                  string `split_words:"true" required:"false"`
-	SfUser                 string `split_words:"true" required:"false"`
-	SfPassword             string `split_words:"true" required:"false"`
-	SfToken                string `split_words:"true" required:"false"`
-	NxUser                 string `split_words:"true" required:"false"`
-	NxPassword             string `split_words:"true" required:"false"`
-	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
-}
-
 type NpsMessage struct {
-	Name string `schema:"name,required"`
-	Email string `schema:"email,required"`
-	Website string `schema:"website,required"`
-	Rating *int `schema:"rating"`
+	Name     string  `schema:"name,required"`
+	Email    string  `schema:"email,required"`
+	Website  string  `schema:"website,required"`
+	Rating   *int    `schema:"rating"`
 	Feedback *string `schema:"feedback"`
 }
 
 type SlackDAO interface {
-	sendSlackMessage(token string, attachments slack.Attachment, channel string) error
-	getValues() []string
+	SendSlackMessage(token string, attachments slack.Attachment, channel string) error
+	GetValues() []string
 }
 
-type SlackDAOFake struct {
-	Recorded []string
-}
-type SlackDAOReal struct{}
+type SlackDAOImpl struct{}
 
-func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
-	s.Recorded = []string{token, channel}
-	return nil
-}
-
-func (s *SlackDAOFake) getValues() []string {
-	return s.Recorded
-}
-
-func (s *SlackDAOReal) getValues() []string {
+func (s *SlackDAOImpl) GetValues() []string {
 	return []string{"", ""}
 }
 
-func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
+func (s *SlackDAOImpl) SendSlackMessage(token string, attachments slack.Attachment, channel string) error {
 	api := slack.New(token)
 	channelID, timestamp, err := api.PostMessage(
 		channel,
@@ -74,22 +49,22 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 }
 
 var router *mux.Router
-var env envVars
+var env common.EnvVars
 
 var decoder = schema.NewDecoder()
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	blanks := findBlankEnvVars(env)
+	blanks := common.FindBlankEnvVars(env)
 	if len(blanks) > 0 {
 		err := fmt.Errorf("the following env vars are blank: %s", strings.Join(blanks, ", "))
 		if env.DevMode != "development" {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		log.Println(err.Error())
@@ -110,7 +85,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
 	salesforceDAOReal := salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOReal{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOImpl{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
@@ -130,27 +105,27 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, s
 	var nps NpsMessage
 
 	err := decoder.Decode(&nps, r.URL.Query())
-    if err != nil {
-        sendInternalServerError(w, err)
+	if err != nil {
+		common.SendInternalServerError(w, err)
 		return
-    }
+	}
 
 	query := strings.Split(nps.Website, " ")[0]
 	responseData, err := salesforceApi.NPSQuery(query)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
 	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	err = slackApi.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
+	err = slackApi.SendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 }
@@ -160,7 +135,7 @@ func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountI
 	if len(salesforceData) > 0 {
 		mrr = "$" + humanize.Comma(int64(salesforceData[0].FamilyMRR))
 		rep = salesforceData[0].Manager
-	} 
+	}
 	red := "#eb0101"
 	yellow := "#b8ba31"
 	green := "#35a64f"
@@ -230,21 +205,4 @@ func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountI
 
 	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 	return attachments, nil
-}
-
-func sendInternalServerError(res http.ResponseWriter, err error) {
-	log.Println(err.Error())
-	http.Error(res, err.Error(), http.StatusInternalServerError)
-}
-
-func findBlankEnvVars(env envVars) []string {
-	var blanks []string
-	valueOfStruct := reflect.ValueOf(env)
-	typeOfStruct := valueOfStruct.Type()
-	for i := 0; i < valueOfStruct.NumField(); i++ {
-		if valueOfStruct.Field(i).Interface() == "" {
-			blanks = append(blanks, typeOfStruct.Field(i).Name)
-		}
-	}
-	return blanks
 }

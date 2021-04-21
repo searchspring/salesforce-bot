@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"reflect"
 	"strings"
 	"time"
 
@@ -18,38 +17,26 @@ import (
 
 	"github.com/searchspring/nebo/nextopia"
 	"github.com/searchspring/nebo/salesforce"
+	"github.com/searchspring/nebo/api/config"
 )
-
-type envVars struct {
-	DevMode                string `split_words:"true" required:"true"`
-	SlackVerificationToken string `split_words:"true" required:"true"`
-	SlackOauthToken        string `split_words:"true" required:"true"`
-	SfURL                  string `split_words:"true" required:"true"`
-	SfUser                 string `split_words:"true" required:"true"`
-	SfPassword             string `split_words:"true" required:"true"`
-	SfToken                string `split_words:"true" required:"true"`
-	NxUser                 string `split_words:"true" required:"true"`
-	NxPassword             string `split_words:"true" required:"true"`
-	GdriveFireDocFolderID  string `split_words:"true" required:"true"`
-}
 
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
 
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
-	var env envVars
+	var env common.EnvVars
 	err := envconfig.Process("", &env)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	blanks := findBlankEnvVars(env)
+	blanks := common.FindBlankEnvVars(env)
 	if len(blanks) > 0 {
 		err := fmt.Errorf("the following env vars are blank: %s", strings.Join(blanks, ", "))
 		if env.DevMode != "development" {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		log.Print(err.Error())
@@ -57,7 +44,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	s, err := slack.SlashCommandParse(r)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
@@ -79,12 +66,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if salesForceDAO == nil {
-			sendInternalServerError(w, errors.New("missing required Salesforce credentials"))
+			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
 		responseJSON, err := salesForceDAO.Query(s.Text)
 		if err != nil {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		w.Write(responseJSON)
@@ -108,12 +95,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if nextopiaDAO == nil {
-			sendInternalServerError(w, errors.New("missing required Nextopia credentials"))
+			common.SendInternalServerError(w, errors.New("missing required Nextopia credentials"))
 			return
 		}
 		responseJSON, err := nextopiaDAO.Query(s.Text)
 		if err != nil {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		w.Write(responseJSON)
@@ -125,12 +112,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if salesForceDAO == nil {
-			sendInternalServerError(w, errors.New("missing required Salesforce credentials"))
+			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
 		responseJSON, err := salesForceDAO.IDQuery(s.Text)
 		if err != nil {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		w.Write(responseJSON)
@@ -155,7 +142,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		sendInternalServerError(w, errors.New("unknown slash command "+s.Command))
+		common.SendInternalServerError(w, errors.New("unknown slash command "+s.Command))
 		return
 	}
 }
@@ -266,21 +253,4 @@ func fireDownResponse() []byte {
 
 func timestamp(currentTime time.Time) string {
 	return fmt.Sprint(currentTime.UTC().Format("2006-01-02-15-04"))
-}
-
-func sendInternalServerError(w http.ResponseWriter, err error) {
-	log.Println(err.Error())
-	http.Error(w, err.Error(), http.StatusInternalServerError)
-}
-
-func findBlankEnvVars(env envVars) []string {
-	var blanks []string
-	valueOfStruct := reflect.ValueOf(env)
-	typeOfStruct := valueOfStruct.Type()
-	for i := 0; i < valueOfStruct.NumField(); i++ {
-		if valueOfStruct.Field(i).Interface() == "" {
-			blanks = append(blanks, typeOfStruct.Field(i).Name)
-		}
-	}
-	return blanks
 }

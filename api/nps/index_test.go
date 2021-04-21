@@ -1,7 +1,6 @@
 package nps
 
 import (
-	"fmt"
 	"log"
 	"net/http/httptest"
 	"testing"
@@ -56,11 +55,3 @@ func TestSalesforceSearchKey(t *testing.T) {
 	require.Equal(t, "mattsmith.test", sfdao.GetSearchKey())
 }
 
-func TestParseUrl(t *testing.T) {
-	urlString, err := parseUrl(httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&email=matt@smith.test&website=mattsmith.test&feedback=Perfect", nil))
-	fmt.Println(urlString)
-	if err != nil {
-		log.Println(err)
-		t.Fail()
-	}
-}

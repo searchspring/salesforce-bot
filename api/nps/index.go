@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
-	"github.com/dustin/go-humanize"
 )
 
 type envVars struct {
@@ -28,6 +28,14 @@ type envVars struct {
 	NxUser                 string `split_words:"true" required:"false"`
 	NxPassword             string `split_words:"true" required:"false"`
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
+}
+
+type NpsMessage struct {
+	Name string `schema:"name,required"`
+	Email string `schema:"email,required"`
+	Website string `schema:"website,required"`
+	Rating *int `schema:"rating"`
+	Feedback *string `schema:"feedback"`
 }
 
 type SlackDAO interface {
@@ -67,6 +75,8 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 
 var router *mux.Router
 var env envVars
+
+var decoder = schema.NewDecoder()
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)
@@ -117,21 +127,22 @@ func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, 
 
 func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceApi salesforce.DAO) {
 
-	urlMap, err := parseUrl(r)
-	if err != nil {
-		sendInternalServerError(w, err)
-		return
-	}
+	var nps NpsMessage
 
-	fmt.Println("SF API: ", salesforceApi)
-	query := strings.Split(urlMap["website"][0], " ")[0]
+	err := decoder.Decode(&nps, r.URL.Query())
+    if err != nil {
+        sendInternalServerError(w, err)
+		return
+    }
+
+	query := strings.Split(nps.Website, " ")[0]
 	responseData, err := salesforceApi.NPSQuery(query)
 	if err != nil {
 		sendInternalServerError(w, err)
 		return
 	}
 
-	attachments, err := createSlackAttachment(urlMap, responseData)
+	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {
 		sendInternalServerError(w, err)
 		return
@@ -144,7 +155,7 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, s
 	}
 }
 
-func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
+func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
 	mrr, rep := "Unknown", "Unknown"
 	if len(salesforceData) > 0 {
 		mrr = "$" + humanize.Comma(int64(salesforceData[0].FamilyMRR))
@@ -159,17 +170,17 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Name",
-				Value: urlMap["name"][0],
+				Value: nps.Name,
 				Short: true,
 			},
 			{
 				Title: "Website",
-				Value: urlMap["website"][0],
+				Value: nps.Website,
 				Short: true,
 			},
 			{
 				Title: "Email",
-				Value: urlMap["email"][0],
+				Value: nps.Email,
 				Short: true,
 			},
 			{
@@ -184,33 +195,30 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 			},
 		},
 	}
+
 	newField := slack.AttachmentField{}
-	if _, exists := urlMap["rating"]; exists {
+	if nps.Rating != nil {
 		newField = slack.AttachmentField{
 			Title: "Rating",
-			Value: urlMap["rating"][0],
+			Value: strconv.Itoa(*nps.Rating),
 			Short: true,
 		}
 
-		i, err := strconv.Atoi(urlMap["rating"][0]) 
-		if err != nil {
-			return slack.Attachment{}, err 
-		}
-		if i > 8 {
+		if *nps.Rating > 8 {
 			attachments.Color = green
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/glowing-star_1f31f.png"
-		} else if i > 6 && i <= 8 {
+		} else if *nps.Rating > 6 && *nps.Rating <= 8 {
 			attachments.Color = yellow
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/neutral-face_1f610.png"
 		} else {
 			attachments.Color = red
 			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/pile-of-poo_1f4a9.png"
 		}
-	} else if _, exists := urlMap["feedback"]; exists {
+	} else if nps.Feedback != nil {
 		attachments.AuthorName = "New NPS Feedback"
 		newField = slack.AttachmentField{
 			Title: "Feedback",
-			Value: urlMap["feedback"][0],
+			Value: *nps.Feedback,
 		}
 	} else {
 		attachments.AuthorName = "Error"
@@ -222,49 +230,6 @@ func createSlackAttachment(urlMap map[string][]string, salesforceData []*salesfo
 
 	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 	return attachments, nil
-}
-
-func parseUrl(r *http.Request) (map[string][]string, error) {
-	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false}
-	u, err := url.Parse(r.URL.String())
-
-	if err != nil {
-		return nil, err
-	}
-
-	urlParams := u.Query()
-
-	if len(urlParams) < 1 {
-		return nil, fmt.Errorf("url params are missing")
-	}
-
-	for k := range urlParams {
-		_, exists := expectedKeys[k]
-		if !exists {
-			return nil, fmt.Errorf("field %s does not exist", k)
-		}
-		expectedKeys[k] = true
-	}
-
-	if falseKeys, ok := mapIsTrue(expectedKeys); ok {
-		return nil, fmt.Errorf("request is missing keys: %s", falseKeys)
-	}
-
-	return urlParams, nil
-}
-
-func mapIsTrue(inputMap map[string]bool) (string, bool) {
-	falseKeys := ""
-	for k, v := range inputMap {
-		if !v {
-			falseKeys += (k + ", ")
-		}
-	}
-	if len(falseKeys) > 0 {
-		return falseKeys, true
-	}
-	return falseKeys, false
-
 }
 
 func sendInternalServerError(res http.ResponseWriter, err error) {

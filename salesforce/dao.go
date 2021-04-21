@@ -31,7 +31,7 @@ var Platforms = []string{
 	"Yahoo",
 }
 
-type accountInfo struct {
+type AccountInfo struct {
 	Website     string
 	Manager     string
 	Active      string
@@ -50,6 +50,9 @@ type DAO interface {
 	Query(query string) ([]byte, error)
 	IDQuery(query string) ([]byte, error)
 	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
+	NPSQuery(query string) ([]*AccountInfo, error)
+	StructFromResult(query string, result *simpleforce.QueryResult) ([]*AccountInfo, error)
+	GetSearchKey() string
 }
 
 // DAOImpl defines the properties of the DAO
@@ -116,7 +119,7 @@ func (s *DAOImpl) IDQuery(search string) ([]byte, error) {
 }
 
 func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {
-	accounts := []*accountInfo{}
+	accounts := []*AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -161,7 +164,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			state = fmt.Sprintf("%s", record["BillingState"])
 		}
 
-		accounts = append(accounts, &accountInfo{
+		accounts = append(accounts, &AccountInfo{
 			Website:     fmt.Sprintf("%s", record["Website"]),
 			Manager:     fmt.Sprintf("%s", managerName),
 			Active:      fmt.Sprintf("%s", active),
@@ -184,8 +187,72 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 	return json.Marshal(msg)
 }
 
-func truncateAccounts(accounts []*accountInfo) []*accountInfo {
-	truncated := []*accountInfo{}
+// nps functions
+func (s *DAOImpl) NPSQuery(search string) ([]*AccountInfo, error) {
+	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
+	if err != nil {
+		return nil, err
+	}
+
+	sanitized := reg.ReplaceAllString(search, "")
+
+	q := "SELECT " + selectFields + " " +
+		"FROM Account WHERE Type IN ('Customer', 'Inactive Customer') " +
+		"AND (Website LIKE '%" + sanitized + "%' OR Platform__c LIKE '%" + sanitized +
+		"%' OR Tracking_Code__c = '" + sanitized + "') ORDER BY Chargify_MRR__c DESC"
+	result, err := s.Client.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	return s.StructFromResult(sanitized, result)
+}
+
+func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*AccountInfo, error) {
+	accounts := []*AccountInfo{}
+	for _, record := range result.Records {
+		manager := record["CS_Manager__r"]
+		managerName := "unknown"
+		if manager != nil {
+			if mapName, ok := (manager.(map[string]interface{}))["Name"]; ok {
+				managerName = fmt.Sprintf("%s", mapName)
+			}
+		}
+		Type := record["Type"]
+		active := "Active"
+		if Type != "Customer" {
+			active = "Not active"
+		}
+		mrr := float64(-1)
+		if record["Chargify_MRR__c"] != nil {
+			mrr = record["Chargify_MRR__c"].(float64)
+		}
+
+		familymrr := float64(-1)
+		if record["Family_MRR__c"] != nil {
+			familymrr = record["Family_MRR__c"].(float64)
+		}
+
+		accounts = append(accounts, &AccountInfo{
+			Manager:     managerName,
+			Active:      active,
+			MRR:         mrr,
+			FamilyMRR:   familymrr,
+		})
+	}
+	accounts = cleanAccounts(accounts)
+	if !isPlatformSearch(search) {
+		accounts = sortAccounts(accounts)
+	}
+	accounts = truncateAccounts(accounts)
+	return accounts, nil
+}
+
+func (s *DAOImpl) GetSearchKey() string {
+	return ""
+}
+
+func truncateAccounts(accounts []*AccountInfo) []*AccountInfo {
+	truncated := []*AccountInfo{}
 	for i, account := range accounts {
 		if i == 20 {
 			break
@@ -204,7 +271,7 @@ func isPlatformSearch(search string) bool {
 }
 
 // example formatting here: https://api.slack.com/reference/messaging/attachments
-func formatAccountInfos(accountInfos []*accountInfo, search string) *slack.Msg {
+func formatAccountInfos(accountInfos []*AccountInfo, search string) *slack.Msg {
 	initialText := "Reps for search: " + search
 	if len(accountInfos) == 0 {
 		initialText = "No results for: " + search
@@ -242,7 +309,7 @@ func formatAccountInfos(accountInfos []*accountInfo, search string) *slack.Msg {
 	return msg
 }
 
-func cleanAccounts(accounts []*accountInfo) []*accountInfo {
+func cleanAccounts(accounts []*AccountInfo) []*AccountInfo {
 	for _, account := range accounts {
 		w := account.Website
 		if strings.HasPrefix(w, "http://") || strings.HasPrefix(w, "https://") {
@@ -258,9 +325,10 @@ func cleanAccounts(accounts []*accountInfo) []*accountInfo {
 	}
 	return accounts
 }
-func sortAccounts(accounts []*accountInfo) []*accountInfo {
+func sortAccounts(accounts []*AccountInfo) []*AccountInfo {
 	sort.Slice(accounts, func(i, j int) bool {
 		return len(accounts[i].Website) < len(accounts[j].Website)
 	})
 	return accounts
 }
+

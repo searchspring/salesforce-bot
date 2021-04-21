@@ -20,6 +20,10 @@
     {
       "src": "api/nps/index.go", 
       "use": "@vercel/go"
+    },
+    {
+      "src": "api/slackEvents/index.go", 
+      "use": "@vercel/go"
     }
   ],
   "routes": [
@@ -30,6 +34,10 @@
     {
       "src": "/nps",
       "dest": "/api/nps"
+    },
+    {
+      "src": "/slackEvents",
+      "dest": "/api/slackEvents"
     }
   ]
 }

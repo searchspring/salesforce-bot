@@ -1,1 +1,1 @@
-package nps
+package slackEvents

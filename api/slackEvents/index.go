@@ -1,4 +1,4 @@
-package nps
+package slackEvents
 
 import (
 	"encoding/json"

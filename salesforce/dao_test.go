@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type salesforceDAOTest struct{}
-
 func createQueryResults() *simpleforce.QueryResult {
 	qr := &simpleforce.QueryResult{}
 	json.Unmarshal([]byte(`{ "totalSize": 1,
@@ -53,3 +51,4 @@ func TestFormatAccountInfos(t *testing.T) {
 func c(b []byte, e error) string {
 	return string(b)
 }
+

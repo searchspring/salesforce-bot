@@ -4,56 +4,39 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/dustin/go-humanize"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/schema"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
+	"github.com/searchspring/nebo/salesforce"
+	"github.com/searchspring/nebo/api/config"
 )
 
-type envVars struct {
-	DevMode                string `split_words:"true" required:"false"`
-	SlackVerificationToken string `split_words:"true" required:"false"`
-	SlackOauthToken        string `split_words:"true" required:"false"`
-	SfURL                  string `split_words:"true" required:"false"`
-	SfUser                 string `split_words:"true" required:"false"`
-	SfPassword             string `split_words:"true" required:"false"`
-	SfToken                string `split_words:"true" required:"false"`
-	NxUser                 string `split_words:"true" required:"false"`
-	NxPassword             string `split_words:"true" required:"false"`
-	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
+type NpsMessage struct {
+	Name     string  `schema:"name,required"`
+	Email    string  `schema:"email,required"`
+	Website  string  `schema:"website,required"`
+	Rating   *int    `schema:"rating"`
+	Feedback *string `schema:"feedback"`
 }
 
 type SlackDAO interface {
-	sendSlackMessage(token string, attachments slack.Attachment, channel string) error
-	getValues() []string
+	SendSlackMessage(token string, attachments slack.Attachment, channel string) error
+	GetValues() []string
 }
 
-type SlackDAOFake struct {
-	Recorded []string
-}
-type SlackDAOReal struct{}
+type SlackDAOImpl struct{}
 
-var slackDAO SlackDAO = nil
-
-func (s *SlackDAOFake) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
-
-	s.Recorded = []string{token, channel}
-	return nil
-}
-
-func (s *SlackDAOFake) getValues() []string {
-	return s.Recorded
-}
-
-func (s *SlackDAOReal) getValues() []string {
+func (s *SlackDAOImpl) GetValues() []string {
 	return []string{"", ""}
 }
 
-func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachment, channel string) error {
+func (s *SlackDAOImpl) SendSlackMessage(token string, attachments slack.Attachment, channel string) error {
 	api := slack.New(token)
 	channelID, timestamp, err := api.PostMessage(
 		channel,
@@ -65,51 +48,94 @@ func (s *SlackDAOReal) sendSlackMessage(token string, attachments slack.Attachme
 	return nil
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
+var router *mux.Router
+var env common.EnvVars
 
-	var env envVars
+var decoder = schema.NewDecoder()
+
+func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	blanks := findBlankEnvVars(env)
+	blanks := common.FindBlankEnvVars(env)
 	if len(blanks) > 0 {
 		err := fmt.Errorf("the following env vars are blank: %s", strings.Join(blanks, ", "))
 		if env.DevMode != "development" {
-			sendInternalServerError(w, err)
+			common.SendInternalServerError(w, err)
 			return
 		}
 		log.Println(err.Error())
 	}
 
-	urlMap, err := parseUrl(r)
+	log.Println(r.Method, r.URL.Path)
+	if router == nil {
+		r, err := CreateRouter()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		router = r
+	}
+	router.ServeHTTP(w, r)
+}
+
+func CreateRouter() (*mux.Router, error) {
+	router := mux.NewRouter()
+	salesforceDAOReal := salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOImpl{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	router.Use(mux.CORSMethodMiddleware(router))
+	return router, nil
+}
+
+func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceDAOReal salesforce.DAO), slackApi SlackDAO, salesforceDAOReal salesforce.DAO) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			return
+		}
+		apiRequest(w, r, slackApi, salesforceDAOReal)
+	}
+}
+
+func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceApi salesforce.DAO) {
+
+	var nps NpsMessage
+
+	err := decoder.Decode(&nps, r.URL.Query())
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	if _, exists := urlMap["test"]; exists {
-		slackDAO = &SlackDAOFake{}
-	} else {
-		slackDAO = &SlackDAOReal{}
-	}
-
-	attachments, err := createSlackAttachment(urlMap)
+	query := strings.Split(nps.Website, " ")[0]
+	responseData, err := salesforceApi.NPSQuery(query)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
 		return
 	}
 
-	err = slackDAO.sendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
+	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {
-		sendInternalServerError(w, err)
+		common.SendInternalServerError(w, err)
+		return
+	}
+
+	err = slackApi.SendSlackMessage(env.SlackOauthToken, attachments, os.Getenv("CHANNEL_ID"))
+	if err != nil {
+		common.SendInternalServerError(w, err)
 		return
 	}
 }
 
-func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error) {
+func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
+	mrr, rep := "Unknown", "Unknown"
+	if len(salesforceData) > 0 {
+		mrr = "$" + humanize.Comma(int64(salesforceData[0].FamilyMRR))
+		rep = salesforceData[0].Manager
+	}
 	red := "#eb0101"
 	yellow := "#b8ba31"
 	green := "#35a64f"
@@ -119,46 +145,58 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Name",
-				Value: urlMap["name"][0],
+				Value: nps.Name,
 				Short: true,
 			},
 			{
 				Title: "Website",
-				Value: urlMap["website"][0],
+				Value: nps.Website,
 				Short: true,
 			},
 			{
 				Title: "Email",
-				Value: urlMap["email"][0],
+				Value: nps.Email,
+				Short: true,
+			},
+			{
+				Title: "Family MRR",
+				Value: mrr,
+				Short: true,
+			},
+			{
+				Title: "Customer Success Manager",
+				Value: rep,
 				Short: true,
 			},
 		},
 	}
+
 	newField := slack.AttachmentField{}
-	if _, exists := urlMap["rating"]; exists {
+	if nps.Rating != nil {
 		newField = slack.AttachmentField{
 			Title: "Rating",
-			Value: urlMap["rating"][0],
+			Value: strconv.Itoa(*nps.Rating),
 			Short: true,
 		}
 
-		i, err := strconv.Atoi(urlMap["rating"][0]) 
-		if err != nil {
-			return slack.Attachment{}, err 
-		}
-		if i > 8 {
+		if *nps.Rating > 8 {
 			attachments.Color = green
-		} else if i > 6 && i <= 8 {
+			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/glowing-star_1f31f.png"
+		} else if *nps.Rating > 6 && *nps.Rating <= 8 {
 			attachments.Color = yellow
+			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/neutral-face_1f610.png"
 		} else {
 			attachments.Color = red
+			attachments.AuthorIcon = "https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/240/apple/271/pile-of-poo_1f4a9.png"
 		}
-	} else if _, exists := urlMap["feedback"]; exists {
+	} else if nps.Feedback != nil {
+		attachments.AuthorName = "New NPS Feedback"
 		newField = slack.AttachmentField{
 			Title: "Feedback",
-			Value: urlMap["feedback"][0],
+			Value: *nps.Feedback,
 		}
 	} else {
+		attachments.AuthorName = "Error"
 		newField = slack.AttachmentField{
 			Title: "Error",
 			Value: "No rating or feedback was given",
@@ -167,64 +205,4 @@ func createSlackAttachment(urlMap map[string][]string) (slack.Attachment, error)
 
 	attachments.Fields = append([]slack.AttachmentField{newField}, attachments.Fields...)
 	return attachments, nil
-}
-
-func parseUrl(r *http.Request) (map[string][]string, error) {
-	expectedKeys := map[string]bool{"rating": true, "feedback": true, "name": false, "email": false, "website": false, "test": true}
-	u, err := url.Parse(r.URL.String())
-
-	if err != nil {
-		return nil, err
-	}
-
-	urlParams := u.Query()
-
-	if len(urlParams) < 1 {
-		return nil, fmt.Errorf("url params are missing")
-	}
-
-	for k := range urlParams {
-		_, exists := expectedKeys[k]
-		if !exists {
-			return nil, fmt.Errorf("field %s does not exist", k)
-		}
-		expectedKeys[k] = true
-	}
-
-	if falseKeys, ok := mapIsTrue(expectedKeys); ok {
-		return nil, fmt.Errorf("request is missing keys: %s", falseKeys)
-	}
-
-	return urlParams, nil
-}
-
-func mapIsTrue(inputMap map[string]bool) (string, bool) {
-	falseKeys := ""
-	for k, v := range inputMap {
-		if !v {
-			falseKeys += (k + ", ")
-		}
-	}
-	if len(falseKeys) > 0 {
-		return falseKeys, true
-	}
-	return falseKeys, false
-
-}
-
-func sendInternalServerError(res http.ResponseWriter, err error) {
-	log.Println(err.Error())
-	http.Error(res, err.Error(), http.StatusInternalServerError)
-}
-
-func findBlankEnvVars(env envVars) []string {
-	var blanks []string
-	valueOfStruct := reflect.ValueOf(env)
-	typeOfStruct := valueOfStruct.Type()
-	for i := 0; i < valueOfStruct.NumField(); i++ {
-		if valueOfStruct.Field(i).Interface() == "" {
-			blanks = append(blanks, typeOfStruct.Field(i).Name)
-		}
-	}
-	return blanks
 }

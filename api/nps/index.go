@@ -25,29 +25,6 @@ type NpsMessage struct {
 	Feedback *string `schema:"feedback"`
 }
 
-type SlackDAO interface {
-	SendSlackMessage(token string, attachments slack.Attachment, channel string) error
-	GetValues() []string
-}
-
-type SlackDAOImpl struct{}
-
-func (s *SlackDAOImpl) GetValues() []string {
-	return []string{"", ""}
-}
-
-func (s *SlackDAOImpl) SendSlackMessage(token string, attachments slack.Attachment, channel string) error {
-	api := slack.New(token)
-	channelID, timestamp, err := api.PostMessage(
-		channel,
-		slack.MsgOptionAttachments(attachments))
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Message successfully sent to channel %s at %s", channelID, timestamp)
-	return nil
-}
-
 var router *mux.Router
 var env common.EnvVars
 
@@ -85,12 +62,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
 	salesforceDAOReal := salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &SlackDAOImpl{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &common.SlackDAOImpl{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
 
-func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceDAOReal salesforce.DAO), slackApi SlackDAO, salesforceDAOReal salesforce.DAO) func(w http.ResponseWriter, r *http.Request) {
+func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi common.SlackDAO, salesforceDAOReal salesforce.DAO), slackApi common.SlackDAO, salesforceDAOReal salesforce.DAO) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.Method == http.MethodOptions {
@@ -100,7 +77,7 @@ func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi SlackDAO, salesforceApi salesforce.DAO) {
+func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.SlackDAO, salesforceApi salesforce.DAO) {
 
 	var nps NpsMessage
 

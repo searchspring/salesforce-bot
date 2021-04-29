@@ -27,9 +27,9 @@ func (s *SalesforceDAO) StructFromResult(search string, result *simpleforce.Quer
 }
 func (s *SalesforceDAO) Query(search string) ([]byte, error)   { return []byte{}, nil }
 func (s *SalesforceDAO) IDQuery(search string) ([]byte, error) { return []byte{}, nil }
-func (s *SalesforceDAO) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {
-	return []byte{}, nil
-}
+func (s *SalesforceDAO) DomainQuery() ([]byte, error) { return []byte{}, nil }
+func (s *SalesforceDAO) ResultToStruct(result *simpleforce.QueryResult) ([]byte, error) {return []byte{}, nil}
+func (s *SalesforceDAO) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {return []byte{}, nil}
 
 type SlackDAO struct {
 	Recorded []string

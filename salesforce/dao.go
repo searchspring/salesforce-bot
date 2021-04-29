@@ -45,6 +45,11 @@ type AccountInfo struct {
 	State       string
 }
 
+type DomainAndID struct {
+	Website string
+	SiteId  string
+}
+
 // DAO acts as the salesforce DAO
 type DAO interface {
 	Query(query string) ([]byte, error)
@@ -53,6 +58,8 @@ type DAO interface {
 	NPSQuery(query string) ([]*AccountInfo, error)
 	StructFromResult(query string, result *simpleforce.QueryResult) ([]*AccountInfo, error)
 	GetSearchKey() string
+	DomainQuery() ([]byte, error)
+	ResultToStruct(result *simpleforce.QueryResult) ([]byte, error)
 }
 
 // DAOImpl defines the properties of the DAO
@@ -61,6 +68,7 @@ type DAOImpl struct {
 }
 
 const selectFields = "Type, Website, CS_Manager__r.Name, Family_MRR__c, Chargify_MRR__c, Platform__c, Integration_Type__c, Chargify_Source__c, Tracking_Code__c, BillingCity, BillingCountry, BillingState"
+const domainFields = "Website, Tracking_Code__c"
 
 // NewDAO returns the salesforce DAO
 func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO {
@@ -116,6 +124,29 @@ func (s *DAOImpl) IDQuery(search string) ([]byte, error) {
 		return nil, err
 	}
 	return s.ResultToMessage(sanitized, result)
+}
+
+func (s *DAOImpl) DomainQuery() ([]byte, error) {
+
+	q := "SELECT " + domainFields + " " + "FROM Account"
+	result, err := s.Client.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	return s.ResultToStruct(result)
+}
+
+func (s *DAOImpl) ResultToStruct(result *simpleforce.QueryResult) ([]byte, error) {
+	accounts := []*DomainAndID{}
+	for _, record := range result.Records {
+		if record["Tracking_Code__c"] != nil {
+			accounts = append(accounts, &DomainAndID{
+				Website:     fmt.Sprintf("%s", record["Website"]),
+				SiteId: fmt.Sprintf("%s", record["Tracking_Code__c"]),
+			})
+		}
+	}
+	return json.Marshal(accounts)
 }
 
 func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {
@@ -233,10 +264,10 @@ func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResul
 		}
 
 		accounts = append(accounts, &AccountInfo{
-			Manager:     managerName,
-			Active:      active,
-			MRR:         mrr,
-			FamilyMRR:   familymrr,
+			Manager:   managerName,
+			Active:    active,
+			MRR:       mrr,
+			FamilyMRR: familymrr,
 		})
 	}
 	accounts = cleanAccounts(accounts)
@@ -331,4 +362,3 @@ func sortAccounts(accounts []*AccountInfo) []*AccountInfo {
 	})
 	return accounts
 }
-

@@ -28,7 +28,7 @@ type NpsMessage struct {
 var router *mux.Router
 var env common.EnvVars
 
-var decoder = schema.NewDecoder()
+var decoder = schema.NewDecoder()  
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)

@@ -189,7 +189,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			siteId = fmt.Sprintf("%s", record["Tracking_Code__c"])
 		}
 		city := "unknown"
-		state := "state"
+		state := "unknown"
 		if record["BillingCity"] != nil && record["BillingState"] != nil {
 			city = fmt.Sprintf("%s", record["BillingCity"])
 			state = fmt.Sprintf("%s", record["BillingState"])
@@ -329,7 +329,11 @@ func formatAccountInfos(accountInfos []*AccountInfo, search string) *slack.Msg {
 			familymrr = p.Sprintf("$%.2f", ai.FamilyMRR)
 		}
 		mrr = mrr + " (Family MRR: " + familymrr + ")"
-		loc := ai.City + ", " + ai.State
+		loc := ai.City
+		if ai.State != "unknown" {
+			loc += ", " + ai.State
+		} 
+		loc = ai.City + ", " + ai.State
 		text := "Rep: " + ai.Manager + "\nMRR: " + mrr + "\nPlatform: " + ai.Platform + "\nIntegration: " + ai.Integration + "\nProvider: " + ai.Provider + "\nLocation: " + loc
 		msg.Attachments = append(msg.Attachments, slack.Attachment{
 			Color:      "#" + color,

@@ -12,6 +12,7 @@ import (
 	common "github.com/searchspring/nebo/api/config"
 	"github.com/searchspring/nebo/nextopia"
 	"github.com/searchspring/nebo/salesforce"
+	"github.com/searchspring/nebo/google"
 )
 
 var salesForceDAO salesforce.DAO = nil
@@ -33,19 +34,32 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
-	router.HandleFunc("/listSites", wrapGetSitesList(GetSitesList)).Methods(http.MethodGet, http.MethodOptions)
+	googleDAO := google.NewDAO(common.NewClient(&http.Client{}))
+	router.HandleFunc("/listSites", wrapGetSitesList(googleDAO.CheckUserLoggedIn, GetSitesList)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
 
-func wrapGetSitesList(apiRequest func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+func wrapGetSitesList(checkUserLoggedIn func(authorizationToken string) (string, error), apiRequest func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
 			return
 		}
-		apiRequest(w, r)
+		
+		authorization := r.Header.Get("Authorization")
+		if email, err := checkUserLoggedIn(authorization); err != nil {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		} else {
+			if !strings.HasSuffix(email, "@searchspring.com") {
+				http.Error(w, "must have searchspring.com email address to use this systsem", http.StatusForbidden)
+				return
+			}
+			
+			apiRequest(w, r)
+		}
 	}
 }
 

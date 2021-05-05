@@ -46,8 +46,8 @@ type AccountInfo struct {
 }
 
 type DomainAndID struct {
-	Website string
-	SiteId  string
+	Website string 
+	SiteId  string 
 }
 
 // DAO acts as the salesforce DAO
@@ -140,9 +140,10 @@ func (s *DAOImpl) ResultToStruct(result *simpleforce.QueryResult) ([]byte, error
 	accounts := []*DomainAndID{}
 	for _, record := range result.Records {
 		if record["Tracking_Code__c"] != nil {
+			siteId := fmt.Sprintf("%s", record["Tracking_Code__c"])
 			accounts = append(accounts, &DomainAndID{
 				Website:     fmt.Sprintf("%s", record["Website"]),
-				SiteId: fmt.Sprintf("%s", record["Tracking_Code__c"]),
+				SiteId: strings.ToLower(siteId),
 			})
 		}
 	}

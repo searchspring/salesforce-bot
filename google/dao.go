@@ -30,6 +30,7 @@ func (d *DAOImpl) CheckUserLoggedIn(token string) (string, error) {
 	}
 	user := &emailHolder{}
 	fmt.Println("EMAIL: ", user.Email)
+	
 	err = json.Unmarshal(body, user)
 	if err != nil {
 		return "", err

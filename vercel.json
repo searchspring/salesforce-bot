@@ -24,6 +24,10 @@
     {
       "src": "api/slackEvents/index.go", 
       "use": "@vercel/go"
+    },
+    {
+      "src": "api/listSites/index.go", 
+      "use": "@vercel/go"
     }
   ],
   "routes": [
@@ -38,6 +42,10 @@
     {
       "src": "/slackEvents",
       "dest": "/api/slackEvents"
+    },
+    {
+      "src": "/listSites",
+      "dest": "/api/listSites"
     }
   ]
 }

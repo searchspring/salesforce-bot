@@ -29,6 +29,18 @@ func createQueryResults() *simpleforce.QueryResult {
 	return qr
 }
 
+func createDomainQueryResults() *simpleforce.QueryResult {
+	qr := &simpleforce.QueryResult{}
+	json.Unmarshal([]byte(`{ "totalSize": 1,
+        "done": true,
+        "records": [{ 
+                "Website": "fabletics.com",
+                "Tracking_Code__c": "wub9gl"} 
+            ]
+        }`), qr)
+	return qr
+}
+
 func TestFormatAccountInfos(t *testing.T) {
 	dao := &DAOImpl{}
 	response, err := dao.ResultToMessage("search term", createQueryResults())
@@ -46,6 +58,18 @@ func TestFormatAccountInfos(t *testing.T) {
 	require.Contains(t, msg.Attachments[0].Text, "Location: Chicago, IL")
 	require.Equal(t, "fabletics.com (Not active) (SiteId: wub9gl)", msg.Attachments[0].AuthorName)
 	require.Equal(t, "#3A23AD", msg.Attachments[0].Color)
+}
+
+func TestResultToStruct(t *testing.T) {
+	dao := &DAOImpl{}
+	response, err := dao.ResultToStruct(createDomainQueryResults())
+	require.Nil(t, err)
+	data := &[]DomainAndID{}
+	err = json.Unmarshal(response, data)
+	require.Nil(t, err)
+	require.Contains(t, (*data)[0].Website, "fabletics.com")
+	require.Contains(t, (*data)[0].SiteId, "wub9gl")
+
 }
 
 func c(b []byte, e error) string {

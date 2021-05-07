@@ -94,6 +94,7 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 		return
 	}
 
+
 	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {
 		common.SendInternalServerError(w, err)

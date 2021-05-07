@@ -1,29 +1,31 @@
 package metabase
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/grokify/go-metabase/metabase"
 	"github.com/grokify/go-metabase/metabaseutil"
 	mo "github.com/grokify/oauth2more/metabase"
-	"github.com/searchspring/nebo/validator"
+	//"github.com/searchspring/nebo/validator"
 )
 
 type DAO interface {
-	QueryAll(query string) (metabase.DatasetQueryResultsData, error)
+	QueryAll() (metabase.DatasetQueryResults, error)
 }
 
 type DAOImpl struct {
 	Client *metabase.APIClient
 }
 
-func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) DAO {
-	if validator.ContainsEmptyString(mbURL, mbUser, mbPassword, mbToken) {
-		return nil
-	}
+const domainFields = "Name, Tracking_Code__c"
 
+func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) (DAO, mo.AuthResponse, error) {
+	/*
+	if validator.ContainsEmptyString(mbURL, mbUser, mbPassword, mbToken) {
+		return nil, nil
+	}
+*/
 	config := mo.Config{
 		BaseURL:       mbURL,
 		Username:      mbUser,
@@ -32,35 +34,29 @@ func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) DAO 
 		TLSSkipVerify: true,
 	}
 
-	apiClient, _, err := metabaseutil.NewApiClient(config)
+	apiClient, authInfo, err := metabaseutil.NewApiClient(config)
 	if err != nil {
 		log.Println(err.Error())
-		return nil
+		return nil, mo.AuthResponse{}, err
 	}
 
 	return &DAOImpl{
 		Client: apiClient,
-	}
+	}, *authInfo, nil
 }
 
-func (s *DAOImpl) QueryAll(search string) (metabase.DatasetQueryResultsData, error) {
-	sqlInfo := metabaseutil.SQLInfo{}
-	err := json.Unmarshal([]byte("MYSQL REQUEST"), &sqlInfo)
-	if err != nil {
-		log.Println(err.Error())
-		return metabase.DatasetQueryResultsData{}, nil
-	}
+func (s *DAOImpl) QueryAll() (metabase.DatasetQueryResults, error) {
+	var databaseId int64 = 5
+	q := "SELECT " + domainFields + " " + "FROM Websites"
 
-	info, resp, err := metabaseutil.QuerySQL(s.Client, sqlInfo.DatabaseID, sqlInfo.SQL)
+	info, resp, err := metabaseutil.QuerySQL(s.Client, databaseId, q)
 	if err != nil {
 		log.Fatal(err)
-		return metabase.DatasetQueryResultsData{}, nil
+		return metabase.DatasetQueryResults{}, nil
 	} else if resp.StatusCode >= 300 {
 		log.Println(fmt.Sprintf("STATUS_CODE [%v]", resp.StatusCode))
-		return metabase.DatasetQueryResultsData{}, nil
+		return metabase.DatasetQueryResults{}, nil
 	}
 
-	data := info.Data
-
-	return data, nil
+	return info, nil
 }

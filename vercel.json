@@ -10,7 +10,9 @@
     "NX_USER": "@nx-user",
     "NX_PASSWORD": "@nx-password",
     "GDRIVE_FIRE_DOC_FOLDER_ID": "@gdrive-fire-doc-folder-id",
-    "DEV_MODE": "@dev-mode"
+    "DEV_MODE": "@dev-mode",
+    "MB_USER": "@mb-user",
+    "MB_PASSWORD": "@mb-password"
   },
   "builds": [
     {

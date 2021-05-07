@@ -22,6 +22,8 @@ type EnvVars struct {
 	NxUser                 string `split_words:"true" required:"false"`
 	NxPassword             string `split_words:"true" required:"false"`
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
+	MbUser                 string `split_words:"true" required:"false"`
+	MbPassword             string `split_words:"true" required:"false"`
 }
 
 type SlackDAO interface {

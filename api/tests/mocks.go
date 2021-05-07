@@ -1,10 +1,20 @@
 package mocks
 
 import (
+	"github.com/grokify/go-metabase/metabase"
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
 	"github.com/simpleforce/simpleforce"
 )
+
+type MetabaseDAO struct {
+	searchKey string
+}
+
+func (s *MetabaseDAO) QueryAll() (metabase.DatasetQueryResults, error) {
+	response := metabase.DatasetQueryResults{}
+	return response, nil
+}
 
 type SalesforceDAO struct {
 	searchKey string

@@ -53,6 +53,6 @@ func TestSalesforceSearchKey(t *testing.T) {
 	w := httptest.NewRecorder()
 	sfdao := &mocks.SalesforceDAO{}
 	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test%20(2003)", nil), &mocks.SlackDAO{}, sfdao)
-	require.Equal(t, "mattsmith.test", sfdao.GetSearchKey())
+	require.Equal(t, "mattsmith", sfdao.GetSearchKey())
 }
 

@@ -24,8 +24,7 @@ func TestGetSitesList(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	sfdao := &mocks.SalesforceDAO{}
 	mbdao := &mocks.MetabaseDAO{}
-	GetSitesList(w, httptest.NewRequest("GET", "localhost:3000/listSites", nil), sfdao, mbdao)
+	GetSitesList(w, httptest.NewRequest("GET", "localhost:3000/listSites", nil), mbdao)
 	require.Equal(t, 201, w.Result().StatusCode)
 }

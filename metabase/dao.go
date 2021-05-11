@@ -1,31 +1,32 @@
 package metabase
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/grokify/go-metabase/metabase"
 	"github.com/grokify/go-metabase/metabaseutil"
 	mo "github.com/grokify/oauth2more/metabase"
-	//"github.com/searchspring/nebo/validator"
 )
 
 type DAO interface {
-	QueryAll() (metabase.DatasetQueryResults, error)
+	QueryAll() ([]byte, error)
 }
 
 type DAOImpl struct {
 	Client *metabase.APIClient
 }
 
-const domainFields = "Name, Tracking_Code__c"
+type domainAndID struct {
+	Website string
+	SiteId string
+}
 
-func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) (DAO, mo.AuthResponse, error) {
-	/*
-	if validator.ContainsEmptyString(mbURL, mbUser, mbPassword, mbToken) {
-		return nil, nil
-	}
-*/
+const domainFields = "name, trackingCode, active"
+
+func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) (DAO, error) {
+
 	config := mo.Config{
 		BaseURL:       mbURL,
 		Username:      mbUser,
@@ -34,29 +35,43 @@ func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) (DAO
 		TLSSkipVerify: true,
 	}
 
-	apiClient, authInfo, err := metabaseutil.NewApiClient(config)
+	apiClient, _, err := metabaseutil.NewApiClient(config)
 	if err != nil {
 		log.Println(err.Error())
-		return nil, mo.AuthResponse{}, err
+		return nil, err
 	}
 
 	return &DAOImpl{
 		Client: apiClient,
-	}, *authInfo, nil
+	}, nil
 }
 
-func (s *DAOImpl) QueryAll() (metabase.DatasetQueryResults, error) {
+func (s *DAOImpl) QueryAll() ([]byte, error) {
 	var databaseId int64 = 5
-	q := "SELECT " + domainFields + " " + "FROM Websites"
+	data := []domainAndID{}
+
+	q := "SELECT " + domainFields + " " + "FROM websites WHERE active = true"
 
 	info, resp, err := metabaseutil.QuerySQL(s.Client, databaseId, q)
 	if err != nil {
 		log.Fatal(err)
-		return metabase.DatasetQueryResults{}, nil
+		return []byte{}, nil
 	} else if resp.StatusCode >= 300 {
 		log.Println(fmt.Sprintf("STATUS_CODE [%v]", resp.StatusCode))
-		return metabase.DatasetQueryResults{}, nil
+		return []byte{}, err
+	} else if info.RowCount == 2000 {
+		log.Println("DATABASE HAS SURPASSED QUERY LIMIT")
+		return []byte{}, err
 	}
 
-	return info, nil
+	rows := info.Data.Rows
+	
+	for _, v := range rows {
+		data = append(data, domainAndID{
+			Website: fmt.Sprintf("%s", v[0]),
+			SiteId: fmt.Sprintf("%s", v[1]),
+		})
+	}
+
+	return json.Marshal(data)
 }

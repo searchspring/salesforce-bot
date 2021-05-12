@@ -48,11 +48,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
 	googleDAO := google.NewDAO(common.NewClient(&http.Client{}))
-	metabaseDAOReal, err := metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MbUser, env.MbPassword, "")
+	metabaseDAO, err := metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
 	if err != nil {
 		fmt.Println("Metabase Error: ", err)
 	}
-	router.HandleFunc("/listSites", wrapWithAuthorizedCheck(googleDAO.CheckUserLoggedIn, GetSitesList, metabaseDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	router.HandleFunc("/listSites", wrapWithAuthorizedCheck(googleDAO.CheckUserLoggedIn, GetSitesList, metabaseDAO)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
@@ -80,9 +80,8 @@ func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (
 	}
 }
 
-func GetSitesList(w http.ResponseWriter, r *http.Request, metabaseApi metabase.DAO) {
-	
-	data, err := metabaseApi.QueryAll()
+func GetSitesList(w http.ResponseWriter, r *http.Request, metabaseAPI metabase.DAO) {
+	data, err := metabaseAPI.QueryAll()
 	if err != nil {
 		common.SendInternalServerError(w, err)
 		return

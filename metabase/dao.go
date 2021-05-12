@@ -7,7 +7,7 @@ import (
 
 	"github.com/grokify/go-metabase/metabase"
 	"github.com/grokify/go-metabase/metabaseutil"
-	mo "github.com/grokify/oauth2more/metabase"
+	metabaseOAuth "github.com/grokify/oauth2more/metabase"
 )
 
 type DAO interface {
@@ -27,7 +27,7 @@ const domainFields = "name, trackingCode, active"
 
 func NewDAO(mbURL string, mbUser string, mbPassword string, mbToken string) (DAO, error) {
 
-	config := mo.Config{
+	config := metabaseOAuth.Config{
 		BaseURL:       mbURL,
 		Username:      mbUser,
 		Password:      mbPassword,

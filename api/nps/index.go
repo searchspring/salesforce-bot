@@ -87,12 +87,13 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 		return
 	}
 
-	query := strings.Split(nps.Website, " ")[0]
+	query := strings.Split(nps.Website, ".")[0]
 	responseData, err := salesforceApi.NPSQuery(query)
 	if err != nil {
 		common.SendInternalServerError(w, err)
 		return
 	}
+
 
 	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {

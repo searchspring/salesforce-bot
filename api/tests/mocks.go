@@ -1,10 +1,20 @@
 package mocks
 
 import (
+
 	"github.com/nlopes/slack"
 	"github.com/searchspring/nebo/salesforce"
 	"github.com/simpleforce/simpleforce"
 )
+
+type MetabaseDAO struct {
+	searchKey string
+}
+
+func (s *MetabaseDAO) QueryAll() ([]byte ,error) {
+	response := []byte{}
+	return response, nil
+}
 
 type SalesforceDAO struct {
 	searchKey string

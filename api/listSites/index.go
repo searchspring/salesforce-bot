@@ -10,14 +10,14 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	common "github.com/searchspring/nebo/api/config"
-	"github.com/searchspring/nebo/salesforce"
 	"github.com/searchspring/nebo/google"
+	"github.com/searchspring/nebo/metabase"
 )
 
 var router *mux.Router
 var env common.EnvVars
 
-func Handler(w http.ResponseWriter, r *http.Request) {
+func Handler(w http.ResponseWriter, r *http.Request) { 
 	err := envconfig.Process("", &env)
 	if err != nil {
 		common.SendInternalServerError(w, err)
@@ -48,13 +48,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
 	googleDAO := google.NewDAO(common.NewClient(&http.Client{}))
-	salesforceDAOReal := salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-	router.HandleFunc("/listSites", wrapWithAuthorizedCheck(googleDAO.CheckUserLoggedIn, GetSitesList, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	metabaseDAO, err := metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
+	if err != nil {
+		fmt.Println("Metabase Error: ", err)
+	}
+	router.HandleFunc("/listSites", wrapWithAuthorizedCheck(googleDAO.CheckUserLoggedIn, GetSitesList, metabaseDAO)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
 
-func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (string, error), apiRequest func(w http.ResponseWriter, r *http.Request, salesforceDAOReal salesforce.DAO), salesforceDAOReal salesforce.DAO) func(w http.ResponseWriter, r *http.Request) {
+func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (string, error), apiRequest func(w http.ResponseWriter, r *http.Request, metabaseDAOReal metabase.DAO), metabaseDAOReal metabase.DAO) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -72,15 +75,13 @@ func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (
 				return
 			}
 			
-			apiRequest(w, r, salesforceDAOReal)
+			apiRequest(w, r, metabaseDAOReal)
 		}
 	}
 }
 
-// Handler - check routing and call correct methods
-func GetSitesList(w http.ResponseWriter, r *http.Request, salesforceApi salesforce.DAO) {
-
-	listOfSites, err := salesforceApi.DomainQuery()
+func GetSitesList(w http.ResponseWriter, r *http.Request, metabaseAPI metabase.DAO) {
+	data, err := metabaseAPI.QueryAll()
 	if err != nil {
 		common.SendInternalServerError(w, err)
 		return
@@ -88,6 +89,5 @@ func GetSitesList(w http.ResponseWriter, r *http.Request, salesforceApi salesfor
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write(listOfSites)
-
+	w.Write(data)
 }

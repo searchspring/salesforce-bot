@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/schema"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-	"github.com/searchspring/nebo/salesforce"
-	"github.com/searchspring/nebo/api/config"
+	"github.com/searchspring/nebo/dals/salesforce"
+	"github.com/searchspring/nebo/common"
 )
 
 type NpsMessage struct {

@@ -10,7 +10,7 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-	common "github.com/searchspring/nebo/api/config"
+	"github.com/searchspring/nebo/common"
 )
 
 type ChallengeEvent struct {

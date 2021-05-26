@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	common "github.com/searchspring/nebo/api/config"
+	"github.com/searchspring/nebo/common"
 	"github.com/stretchr/testify/require"
 )
 

@@ -9,15 +9,15 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/kelseyhightower/envconfig"
 
-	common "github.com/searchspring/nebo/api/config"
-	"github.com/searchspring/nebo/google"
-	"github.com/searchspring/nebo/metabase"
+	"github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/dals/google"
+	"github.com/searchspring/nebo/dals/metabase"
 )
 
 var router *mux.Router
 var env common.EnvVars
 
-func Handler(w http.ResponseWriter, r *http.Request) { 
+func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)
 	if err != nil {
 		common.SendInternalServerError(w, err)
@@ -64,7 +64,7 @@ func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (
 		if r.Method == http.MethodOptions {
 			return
 		}
-		
+
 		authorization := r.Header.Get("Authorization")
 		if email, err := checkUserLoggedIn(authorization); err != nil {
 			http.Error(w, err.Error(), http.StatusForbidden)
@@ -74,7 +74,7 @@ func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (
 				http.Error(w, "must have searchspring.com email address to use this systsem", http.StatusForbidden)
 				return
 			}
-			
+
 			apiRequest(w, r, metabaseDAOReal)
 		}
 	}

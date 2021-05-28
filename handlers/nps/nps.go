@@ -108,7 +108,7 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 	}
 }
 
-func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
+func createSlackAttachment(nps NpsMessage, salesforceData []*common.AccountInfo) (slack.Attachment, error) {
 	mrr, rep := "Unknown", "Unknown"
 	if len(salesforceData) > 0 {
 		mrr = "$" + humanize.Comma(int64(salesforceData[0].FamilyMRR))

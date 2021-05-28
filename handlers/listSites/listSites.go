@@ -48,16 +48,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
 	googleDAO := google.NewDAO(common.NewClient(&http.Client{}))
-	metabaseDAO, err := metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
-	if err != nil {
-		fmt.Println("Metabase Error: ", err)
-	}
+	metabaseDAO := metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
 	router.HandleFunc("/listSites", wrapWithAuthorizedCheck(googleDAO.CheckUserLoggedIn, GetSitesList, metabaseDAO)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
 
-func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (string, error), apiRequest func(w http.ResponseWriter, r *http.Request, metabaseDAOReal metabase.DAO), metabaseDAOReal metabase.DAO) func(w http.ResponseWriter, r *http.Request) {
+func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (string, error), apiRequest func(w http.ResponseWriter, r *http.Request, metabaseDAO metabase.DAO), metabaseDAO metabase.DAO) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -75,7 +72,7 @@ func wrapWithAuthorizedCheck(checkUserLoggedIn func(authorizationToken string) (
 				return
 			}
 
-			apiRequest(w, r, metabaseDAOReal)
+			apiRequest(w, r, metabaseDAO)
 		}
 	}
 }

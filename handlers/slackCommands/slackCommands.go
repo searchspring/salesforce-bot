@@ -15,13 +15,18 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 
+	"github.com/searchspring/nebo/services/aggregate"
+
+	"github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/dals/metabase"
 	"github.com/searchspring/nebo/dals/nextopia"
 	"github.com/searchspring/nebo/dals/salesforce"
-	"github.com/searchspring/nebo/common"
+
 )
 
 var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
+var metabaseDAO metabase.DAO = nil
 
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +61,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nextopiaDAO = nextopia.NewDAO(env.NxUser, env.NxPassword)
+
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
+	metabaseDAO = metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
+
+	aggregation := aggregate.AggregateServiceImpl{}
+
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
@@ -69,7 +79,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
-		responseJSON, err := salesForceDAO.Query(s.Text)
+		responseJSON, err := metabaseDAO.Query(s.Text)
 		if err != nil {
 			common.SendInternalServerError(w, err)
 			return

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/nlopes/slack"
+	"github.com/searchspring/nebo/common"
 	"github.com/simpleforce/simpleforce"
 	"github.com/stretchr/testify/require"
 )
@@ -33,8 +33,7 @@ func TestFormatAccountInfos(t *testing.T) {
 	dao := &DAOImpl{}
 	response, err := dao.ResultToMessage("search term", createQueryResults())
 	require.Nil(t, err)
-	msg := &slack.Msg{}
-	err = json.Unmarshal(response, msg)
+	msg := common.FormatAccountInfos(response, "fabletics")
 	require.Nil(t, err)
 	require.Contains(t, msg.Text, "search term")
 	require.Contains(t, msg.Attachments[0].Text, "Rep: Ashley Hilton")
@@ -47,4 +46,3 @@ func TestFormatAccountInfos(t *testing.T) {
 	require.Equal(t, "fabletics.com (Not active) (SiteId: wub9gl)", msg.Attachments[0].AuthorName)
 	require.Equal(t, "#3A23AD", msg.Attachments[0].Color)
 }
-

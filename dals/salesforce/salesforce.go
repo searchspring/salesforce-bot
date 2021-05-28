@@ -1,42 +1,23 @@
 package salesforce
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/nlopes/slack"
 	common "github.com/searchspring/nebo/common"
 	"github.com/simpleforce/simpleforce"
-
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 )
-
-type AccountInfo struct {
-	Website     string
-	Manager     string
-	Active      string
-	MRR         float64
-	FamilyMRR   float64
-	Platform    string
-	Integration string
-	Provider    string
-	SiteId      string
-	City        string
-	State       string
-}
 
 // DAO acts as the salesforce DAO
 type DAO interface {
-	Query(query string) ([]byte, error)
-	IDQuery(query string) ([]byte, error)
-	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
-	NPSQuery(query string) ([]*AccountInfo, error)
-	StructFromResult(query string, result *simpleforce.QueryResult) ([]*AccountInfo, error)
+	Query(query string) ([]*common.AccountInfo, error)
+	IDQuery(search string) ([]*common.AccountInfo, error)
+	ResultToMessage(query string, result *simpleforce.QueryResult) ([]*common.AccountInfo, error)
+	NPSQuery(query string) ([]*common.AccountInfo, error)
+	StructFromResult(query string, result *simpleforce.QueryResult) ([]*common.AccountInfo, error)
 	GetSearchKey() string
 }
 
@@ -67,7 +48,7 @@ func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO 
 	}
 }
 
-func (s *DAOImpl) Query(search string) ([]byte, error) {
+func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -86,7 +67,7 @@ func (s *DAOImpl) Query(search string) ([]byte, error) {
 	return s.ResultToMessage(sanitized, result)
 }
 
-func (s *DAOImpl) IDQuery(search string) ([]byte, error) {
+func (s *DAOImpl) IDQuery(search string) ([]*common.AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -103,8 +84,8 @@ func (s *DAOImpl) IDQuery(search string) ([]byte, error) {
 	return s.ResultToMessage(sanitized, result)
 }
 
-func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {
-	accounts := []*AccountInfo{}
+func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]*common.AccountInfo, error) {
+	accounts := []*common.AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -149,7 +130,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			state = fmt.Sprintf("%s", record["BillingState"])
 		}
 
-		accounts = append(accounts, &AccountInfo{
+		accounts = append(accounts, &common.AccountInfo{
 			Website:     fmt.Sprintf("%s", record["Website"]),
 			Manager:     managerName,
 			Active:      active,
@@ -168,12 +149,11 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 		accounts = sortAccounts(accounts)
 	}
 	accounts = truncateAccounts(accounts)
-	msg := formatAccountInfos(accounts, search)
-	return json.Marshal(msg)
+	return accounts, nil
 }
 
 // nps functions
-func (s *DAOImpl) NPSQuery(search string) ([]*AccountInfo, error) {
+func (s *DAOImpl) NPSQuery(search string) ([]*common.AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -192,8 +172,8 @@ func (s *DAOImpl) NPSQuery(search string) ([]*AccountInfo, error) {
 	return s.StructFromResult(sanitized, result)
 }
 
-func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*AccountInfo, error) {
-	accounts := []*AccountInfo{}
+func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*common.AccountInfo, error) {
+	accounts := []*common.AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -217,7 +197,7 @@ func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResul
 			familymrr = record["Family_MRR__c"].(float64)
 		}
 
-		accounts = append(accounts, &AccountInfo{
+		accounts = append(accounts, &common.AccountInfo{
 			Manager:   managerName,
 			Active:    active,
 			MRR:       mrr,
@@ -236,8 +216,8 @@ func (s *DAOImpl) GetSearchKey() string {
 	return ""
 }
 
-func truncateAccounts(accounts []*AccountInfo) []*AccountInfo {
-	truncated := []*AccountInfo{}
+func truncateAccounts(accounts []*common.AccountInfo) []*common.AccountInfo {
+	truncated := []*common.AccountInfo{}
 	for i, account := range accounts {
 		if i == 20 {
 			break
@@ -255,50 +235,7 @@ func isPlatformSearch(search string) bool {
 	return false
 }
 
-// example formatting here: https://api.slack.com/reference/messaging/attachments
-func formatAccountInfos(accountInfos []*AccountInfo, search string) *slack.Msg {
-	initialText := "Reps for search: " + search
-	if len(accountInfos) == 0 {
-		initialText = "No results for: " + search
-	}
-
-	p := message.NewPrinter(language.English)
-
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeInChannel,
-		Text:         initialText,
-		Attachments:  []slack.Attachment{},
-	}
-	for _, ai := range accountInfos {
-		color := "3A23AD" // Searchspring purple
-		if ai.Manager == "unknown" {
-			color = "FF0000" // red
-		}
-		mrr := "unknown"
-		if ai.MRR != -1 {
-			mrr = p.Sprintf("$%.2f", ai.MRR)
-		}
-		familymrr := "unknown"
-		if ai.FamilyMRR != -1 {
-			familymrr = p.Sprintf("$%.2f", ai.FamilyMRR)
-		}
-		mrr = mrr + " (Family MRR: " + familymrr + ")"
-		loc := ai.City
-		if ai.State != "unknown" {
-			loc += ", " + ai.State
-		} 
-		loc = ai.City + ", " + ai.State
-		text := "Rep: " + ai.Manager + "\nMRR: " + mrr + "\nPlatform: " + ai.Platform + "\nIntegration: " + ai.Integration + "\nProvider: " + ai.Provider + "\nLocation: " + loc
-		msg.Attachments = append(msg.Attachments, slack.Attachment{
-			Color:      "#" + color,
-			Text:       text,
-			AuthorName: ai.Website + " (" + ai.Active + ") (SiteId: " + ai.SiteId + ")",
-		})
-	}
-	return msg
-}
-
-func cleanAccounts(accounts []*AccountInfo) []*AccountInfo {
+func cleanAccounts(accounts []*common.AccountInfo) []*common.AccountInfo {
 	for _, account := range accounts {
 		w := account.Website
 		if strings.HasPrefix(w, "http://") || strings.HasPrefix(w, "https://") {
@@ -314,7 +251,7 @@ func cleanAccounts(accounts []*AccountInfo) []*AccountInfo {
 	}
 	return accounts
 }
-func sortAccounts(accounts []*AccountInfo) []*AccountInfo {
+func sortAccounts(accounts []*common.AccountInfo) []*common.AccountInfo {
 	sort.Slice(accounts, func(i, j int) bool {
 		return len(accounts[i].Website) < len(accounts[j].Website)
 	})

@@ -65,7 +65,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	salesForceDAO = salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
 	metabaseDAO = metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
 
-	aggregation := aggregate.AggregateServiceImpl{}
+	aggregation := aggregate.AggregateServiceImpl{
+		Deps: &aggregate.Deps{
+			MetabaseDAO: metabaseDAO,
+			SalesforceDAO: salesForceDAO,
+		},
+	}
 
 
 	w.Header().Set("Content-type", "application/json")
@@ -79,7 +84,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
-		responseJSON, err := metabaseDAO.Query(s.Text)
+		responseJSON, err := aggregation.Query(s.Text)
 		if err != nil {
 			common.SendInternalServerError(w, err)
 			return
@@ -130,7 +135,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			common.SendInternalServerError(w, err)
 			return
 		}
-		w.Write(responseJSON)
+		formattedRes := common.FormatAccountInfos(responseJSON, s.Text)
+		byteRes, err := json.Marshal(formattedRes)
+		if err != nil {
+			common.SendInternalServerError(w, err)
+			return
+		}
+		w.Write(byteRes)
 		return
 
 	case "/meet":

@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/schema"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-	"github.com/searchspring/nebo/dals/salesforce"
 	"github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/dals/salesforce"
 )
 
 type NpsMessage struct {
@@ -28,7 +28,7 @@ type NpsMessage struct {
 var router *mux.Router
 var env common.EnvVars
 
-var decoder = schema.NewDecoder()  
+var decoder = schema.NewDecoder()
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)
@@ -93,7 +93,6 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 		common.SendInternalServerError(w, err)
 		return
 	}
-
 
 	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {

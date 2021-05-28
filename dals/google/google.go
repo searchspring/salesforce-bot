@@ -3,7 +3,7 @@ package google
 import (
 	"encoding/json"
 
-	common "github.com/searchspring/nebo/api/config"
+	common "github.com/searchspring/nebo/common"
 )
 
 type DAO interface {

@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	common "github.com/searchspring/nebo/api/config"
-	mocks "github.com/searchspring/nebo/api/tests"
+	"github.com/searchspring/nebo/common"
+	mocks "github.com/searchspring/nebo/mocks"
 	"github.com/stretchr/testify/require"
 )
 

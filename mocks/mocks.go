@@ -3,7 +3,7 @@ package mocks
 import (
 
 	"github.com/nlopes/slack"
-	"github.com/searchspring/nebo/salesforce"
+	"github.com/searchspring/nebo/dals/salesforce"
 	"github.com/simpleforce/simpleforce"
 )
 

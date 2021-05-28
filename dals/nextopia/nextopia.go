@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/nlopes/slack"
-	"github.com/searchspring/nebo/validator"
+	common "github.com/searchspring/nebo/common"
 )
 
 // DAO acts as the nextopia DAO
@@ -25,7 +25,7 @@ type DAOImpl struct {
 
 // NewDAO returns the nextopia DAO
 func NewDAO(nxUser string, nxPassword string) DAO {
-	if validator.ContainsEmptyString(nxUser, nxPassword) {
+	if common.ContainsEmptyString(nxUser, nxPassword) {
 		return nil
 	}
 	return &DAOImpl{

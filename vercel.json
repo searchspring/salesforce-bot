@@ -11,43 +11,43 @@
     "NX_PASSWORD": "@nx-password",
     "GDRIVE_FIRE_DOC_FOLDER_ID": "@gdrive-fire-doc-folder-id",
     "DEV_MODE": "@dev-mode",
-    "MB_USER": "@mb-user",
-    "MB_PASSWORD": "@mb-password"
+    "METABASE_USER": "@metabase-user",
+    "METABASE_PASSWORD": "@metabase-password"
   },
   "builds": [
     {
-      "src": "api/slack/index.go",
+      "src": "handlers/slackCommands/slackCommands.go",
       "use": "@vercel/go"
     }, 
     {
-      "src": "api/nps/index.go", 
+      "src": "handlers/nps/nps.go", 
       "use": "@vercel/go"
     },
     {
-      "src": "api/slackEvents/index.go", 
+      "src": "handlers/slackEvents/slackEvents.go", 
       "use": "@vercel/go"
     },
     {
-      "src": "api/listSites/index.go", 
+      "src": "handlers/listSites/listSites.go", 
       "use": "@vercel/go"
     }
   ],
   "routes": [
     {
       "src": "/",
-      "dest": "/api/slack"
+      "dest": "/handlers/slackCommands/slackCommands.go"
     }, 
     {
       "src": "/nps",
-      "dest": "/api/nps"
+      "dest": "/handlers/nps/nps.go"
     },
     {
       "src": "/slackEvents",
-      "dest": "/api/slackEvents"
+      "dest": "/handlers/slackEvents/slackEvents.go"
     },
     {
       "src": "/listSites",
-      "dest": "/api/listSites"
+      "dest": "/handlers/listSites/listSites.go"
     }
   ]
 }

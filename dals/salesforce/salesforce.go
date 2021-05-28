@@ -9,27 +9,12 @@ import (
 	"strings"
 
 	"github.com/nlopes/slack"
-	"github.com/searchspring/nebo/validator"
+	common "github.com/searchspring/nebo/common"
 	"github.com/simpleforce/simpleforce"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
-
-// Platforms is a list of platforms in salesforce
-var Platforms = []string{
-	"3dcart",
-	"BigCommerce",
-	"CommerceV3",
-	"Custom",
-	"Magento",
-	"Miva",
-	"Netsuite",
-	"Other",
-	"Shopify",
-	"Shopify Plus",
-	"Yahoo",
-}
 
 type AccountInfo struct {
 	Website     string
@@ -64,7 +49,7 @@ const selectFields = "Type, Website, CS_Manager__r.Name, Family_MRR__c, Chargify
 
 // NewDAO returns the salesforce DAO
 func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO {
-	if validator.ContainsEmptyString(sfURL, sfUser, sfPassword, sfToken) {
+	if common.ContainsEmptyString(sfURL, sfUser, sfPassword, sfToken) {
 		return nil
 	}
 	client := simpleforce.NewClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
@@ -262,8 +247,8 @@ func truncateAccounts(accounts []*AccountInfo) []*AccountInfo {
 	return truncated
 }
 func isPlatformSearch(search string) bool {
-	for _, platform := range Platforms {
-		if strings.ToLower(search) == strings.ToLower(platform) {
+	for _, platform := range common.Platforms {
+		if strings.EqualFold(search, platform) {
 			return true
 		}
 	}

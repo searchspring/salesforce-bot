@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/searchspring/nebo/api/config"
+	"github.com/searchspring/nebo/common"
 	"github.com/stretchr/testify/require"
-	"github.com/searchspring/nebo/api/tests"
+	"github.com/searchspring/nebo/mocks"
 )
 
 func TestFindBlankEnvVars(t *testing.T) {

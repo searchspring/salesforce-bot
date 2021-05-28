@@ -26,6 +26,21 @@ type EnvVars struct {
 	MetabasePassword       string `split_words:"true" required:"false"`
 }
 
+// Platforms is a list of platforms in salesforce
+var Platforms = []string{
+	"3dcart",
+	"BigCommerce",
+	"CommerceV3",
+	"Custom",
+	"Magento",
+	"Miva",
+	"Netsuite",
+	"Other",
+	"Shopify",
+	"Shopify Plus",
+	"Yahoo",
+}
+
 type SlackDAO interface {
 	SendSlackMessage(token string, attachments slack.Attachment, channel string) error
 	GetValues() []string
@@ -64,6 +79,16 @@ func FindBlankEnvVars(env EnvVars) []string {
 		}
 	}
 	return blanks
+}
+
+// ContainsEmptyString returns true if any of the string variables provided are blank
+func ContainsEmptyString(vars ...string) bool {
+	for _, v := range vars {
+		if v == "" {
+			return true
+		}
+	}
+	return false
 }
 
 // HTTP Google Client Common Code

@@ -15,9 +15,9 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
 
-	"github.com/searchspring/nebo/nextopia"
-	"github.com/searchspring/nebo/salesforce"
-	"github.com/searchspring/nebo/api/config"
+	"github.com/searchspring/nebo/dals/nextopia"
+	"github.com/searchspring/nebo/dals/salesforce"
+	"github.com/searchspring/nebo/common"
 )
 
 var salesForceDAO salesforce.DAO = nil
@@ -157,7 +157,7 @@ func writeHelpFire(w http.ResponseWriter) {
 }
 
 func writeHelpNebo(w http.ResponseWriter) {
-	platformsJoined := strings.ToLower(strings.Join(salesforce.Platforms, ", "))
+	platformsJoined := strings.ToLower(strings.Join(common.Platforms, ", "))
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text: "Nebo usage:\n" +

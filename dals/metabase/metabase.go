@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"sort"
-	"strings"
 
 	"github.com/grokify/go-metabase/metabase"
 	"github.com/grokify/go-metabase/metabaseutil"
@@ -26,6 +24,7 @@ type DAO interface {
 
 type DAOImpl struct {
 	Client *metabase.APIClient
+	Key string
 }
 
 type NpsInfo struct {
@@ -254,70 +253,11 @@ func (s *DAOImpl) ResultToMessage(search string, result *metabase.DatasetQueryRe
 		}
 	}
 
-	accounts = cleanAccounts(accounts)
-	if !isPlatformSearch(search) {
-		accounts = sortAccounts(accounts, "website")
-	}
-	accounts = truncateAccounts(accounts)
-
-	accounts = sortAccounts(accounts, "mrr")
-	fmtutil.PrintJSON(accounts)
-	//msg := formatcommon.AccountInfos(accounts, search)
 	return accounts, nil
-}
-
-// cleaning account arrays
-
-func truncateAccounts(accounts []*common.AccountInfo) []*common.AccountInfo {
-	truncated := []*common.AccountInfo{}
-	for i, account := range accounts {
-		if i == 20 {
-			break
-		}
-		truncated = append(truncated, account)
-	}
-	return truncated
-}
-
-func isPlatformSearch(search string) bool {
-	for _, platform := range common.Platforms {
-		if strings.EqualFold(search, platform) {
-			return true
-		}
-	}
-	return false
-}
-
-func cleanAccounts(accounts []*common.AccountInfo) []*common.AccountInfo {
-	for _, account := range accounts {
-		w := account.Website
-		if strings.HasPrefix(w, "http://") || strings.HasPrefix(w, "https://") {
-			w = w[strings.Index(w, ":")+3:]
-		}
-		if strings.HasPrefix(w, "www.") {
-			w = w[4:]
-		}
-		if strings.HasSuffix(w, "/") {
-			w = w[0 : len(w)-1]
-		}
-		account.Website = w
-	}
-	return accounts
-}
-
-func sortAccounts(accounts []*common.AccountInfo, sortType string) []*common.AccountInfo {
-	sort.Slice(accounts, func(i, j int) bool {
-		if sortType == "website" {
-			return len(accounts[i].Website) < len(accounts[j].Website)
-		} else {
-			return accounts[i].MRR > accounts[j].MRR
-		}
-	})
-	return accounts
 }
 
 // helper functions
 
 func (s *DAOImpl) GetSearchKey() string {
-	return ""
+	return s.Key
 }

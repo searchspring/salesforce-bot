@@ -23,7 +23,7 @@ func TestFindBlankEnvVars(t *testing.T) {
 
 func TestHandlerMissingEnvVars(t *testing.T) {
 	w := httptest.NewRecorder()
-	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil), &mocks.SlackDAO{}, &mocks.SalesforceDAO{})
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt", nil), &mocks.SlackDAO{}, &mocks.MetabaseDAO{})
 	require.Equal(t, 500, w.Result().StatusCode)
 }
 
@@ -32,27 +32,27 @@ func TestHandlerSendSlackMessage(t *testing.T) {
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
 	slack := &mocks.SlackDAO{}
-	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test", nil), slack, &mocks.SalesforceDAO{})
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test", nil), slack, &mocks.MetabaseDAO{})
 	require.Equal(t, []string{"", ""}, slack.GetValues())
 }
 
-func TestSalesforceQuery(t *testing.T) {
-	sfdao := &mocks.SalesforceDAO{}
-	query := "test"
-	response, err := sfdao.NPSQuery(query)
+func TestMetabaseQuery(t *testing.T) {
+	mbdao := &mocks.MetabaseDAO{}
+	query := "tester"
+	response, err := mbdao.QueryNPS(query)
 	if err != nil {
 		log.Println(err)
 		t.Fail()
 	}
-	require.Equal(t, query, response[0].Manager)
+	require.Equal(t, query, response.Manager)
 }
 
-func TestSalesforceSearchKey(t *testing.T) {
+func TestMetabaseSearchKey(t *testing.T) {
 	os.Setenv("DEV_MODE", "development")
 	defer os.Setenv("DEV_MODE", "")
 	w := httptest.NewRecorder()
-	sfdao := &mocks.SalesforceDAO{}
-	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test%20(2003)", nil), &mocks.SlackDAO{}, sfdao)
-	require.Equal(t, "mattsmith", sfdao.GetSearchKey())
+	mbdao := &mocks.MetabaseDAO{}
+	SendNPSMessage(w, httptest.NewRequest("GET", "localhost:3000/nps?name=Matt&rating=10&email=matt@smith.test&website=mattsmith.test%20(2003)", nil), &mocks.SlackDAO{}, mbdao)
+	require.Equal(t, "mattsmith", mbdao.GetSearchKey())
 }
 

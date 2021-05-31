@@ -20,7 +20,12 @@ func (s *MetabaseDAO) GetSearchKey() string {
 }
 
 func (s *MetabaseDAO) QueryNPS(search string) (*metabase.NpsInfo, error) {
-	return &metabase.NpsInfo{}, nil
+	s.searchKey = search
+	return &metabase.NpsInfo{
+		Manager: "tester",
+		MRR: 1,
+		FamilyMRR: 1,
+	}, nil
 }
 
 func (s *MetabaseDAO) Query(search string) ([]*common.AccountInfo, error) { 

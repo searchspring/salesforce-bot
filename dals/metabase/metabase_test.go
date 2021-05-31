@@ -24,5 +24,5 @@ func TestStructFromResult(t *testing.T) {
 
 	require.Contains(t, fmt.Sprint(result.MRR), "-1")
 	require.Contains(t, fmt.Sprint(result.FamilyMRR), "-1")
-	require.Contains(t, result.Manager, "No company found")
+	require.Contains(t, result.Manager, "Unknown")
 }

@@ -110,7 +110,11 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 func createSlackAttachment(nps NpsMessage, metabaseData *metabase.NpsInfo) (slack.Attachment, error) {
 	mrr, rep := "Unknown", "Unknown"
 	if metabaseData != nil {
-		mrr = "$" + humanize.Comma(int64(metabaseData.FamilyMRR))
+		if metabaseData.MRR == 0 {
+			mrr = "$" + humanize.Comma(int64(metabaseData.FamilyMRR))
+		} else {
+			mrr = "$" + humanize.Comma(int64(metabaseData.MRR))
+		}
 		rep = metabaseData.Manager
 	}
 	red := "#eb0101"
@@ -136,7 +140,7 @@ func createSlackAttachment(nps NpsMessage, metabaseData *metabase.NpsInfo) (slac
 				Short: true,
 			},
 			{
-				Title: "Family MRR",
+				Title: "MRR",
 				Value: mrr,
 				Short: true,
 			},

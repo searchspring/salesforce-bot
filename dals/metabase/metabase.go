@@ -145,16 +145,21 @@ func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
 // formatting results
 
 func (s *DAOImpl) StructFromResult(result *metabase.DatasetQueryResultsData) (*NpsInfo, error) {
-	account := &NpsInfo{}
+	account := &NpsInfo{
+		MRR: float64(-1),
+		FamilyMRR: float64(-1),
+		Manager: "Unknown",
+	}
 
-	if len(result.Rows) > 0 {
-		for i, colInfo := range result.Cols {
-			value := result.Rows[0][i]
+	for i := range result.Rows {
+		for k, colInfo := range result.Cols {
+			value := result.Rows[i][k]
 			switch colInfo.Name {
 			case "mrr":
 				account.MRR = float64(0)
 				if value != nil {
 					account.MRR = value.(float64)
+					fmt.Println("MRR: ", value)
 				}
 			case "familyMrr":
 				account.FamilyMRR = float64(0)
@@ -168,11 +173,10 @@ func (s *DAOImpl) StructFromResult(result *metabase.DatasetQueryResultsData) (*N
 				}
 			}
 		}
-	} else {
-		account.MRR = float64(-1)
-		account.FamilyMRR = float64(-1)
-		account.Manager = "No company found"
-	}
+		if account.MRR != 0 || account.FamilyMRR != 0 {
+			break
+		}
+	} 
 
 	return account, nil
 }

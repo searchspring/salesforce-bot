@@ -35,7 +35,6 @@ func TestFormatAccountInfos(t *testing.T) {
 	require.Nil(t, err)
 	msg := common.FormatAccountInfos(response, "fabletics")
 	require.Nil(t, err)
-	require.Contains(t, msg.Text, "search term")
 	require.Contains(t, msg.Attachments[0].Text, "Rep: Ashley Hilton")
 	require.Contains(t, msg.Attachments[0].Text, "MRR: $3,955.17")
 	require.Contains(t, msg.Attachments[0].Text, "Platform: Custom")

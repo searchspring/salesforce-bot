@@ -2,7 +2,6 @@ package aggregate
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -39,17 +38,12 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 	aggregatedData = append(aggregatedData, metabaseData...)
 
 	for _, v := range salesforceData {
-		for _, x := range aggregatedData {
-			fmt.Printf("WebsiteSF: %s WebsiteMB: %s", v.Website, x.Website)
-			fmt.Println()
-			if !exists(v.SiteId, v.Website, aggregatedData) {
-				fmt.Println("New Site Added: ", v.Website)
-				aggregatedData = append(aggregatedData, v)
-				break
-			}
+		if !exists(v.SiteId, v.Website, aggregatedData) {
+			aggregatedData = append(aggregatedData, v)
+			break
 		}
 	}
- 
+
 	aggregatedData = cleanAccounts(aggregatedData)
 	if !isPlatformSearch(search) {
 		aggregatedData = sortAccounts(aggregatedData, "website")

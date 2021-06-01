@@ -34,28 +34,17 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 	}
 
 	var aggregatedData []*common.AccountInfo
-	largestArray, smallestArray := orderArrays(metabaseData, salesforceData)
-	var overlap bool
-	for i := 0; i < len(largestArray); i++ {
-		overlap = false
-		for k := 0; k < len(smallestArray); k++ {
-			if largestArray[i].Website == smallestArray[k].Website || largestArray[i].SiteId == smallestArray[k].SiteId {
-				overlap = true
-				aggregatedData = append(aggregatedData, smallestArray[k])
-				break
-			} else {
-				for m := 0; m < len(largestArray); m++ {
-					if smallestArray[k] == largestArray[m] {
-						aggregatedData = append(aggregatedData, smallestArray[k])
-					}
-				}
+
+	aggregatedData = append(aggregatedData, metabaseData...)
+
+	for _, v := range salesforceData {
+		for _, x := range aggregatedData {
+			if v.Website != x.Website && v.SiteId != x.SiteId {
+				aggregatedData = append(aggregatedData, v)
 			}
 		}
-		if !overlap {
-			aggregatedData = append(aggregatedData, largestArray[i])
-		}
 	}
-
+ 
 	aggregatedData = cleanAccounts(aggregatedData)
 	if !isPlatformSearch(search) {
 		aggregatedData = sortAccounts(aggregatedData, "website")
@@ -68,15 +57,6 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 	return json.Marshal(msg)
 }
 
-// helper functions
-
-func orderArrays(arr1 []*common.AccountInfo, arr2 []*common.AccountInfo) ([]*common.AccountInfo, []*common.AccountInfo) {
-	if len(arr1) > len(arr2) {
-		return arr1, arr2
-	} else {
-		return arr2, arr1
-	}
-}
 
 // cleaning account arrays
 

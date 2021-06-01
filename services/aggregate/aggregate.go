@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -39,8 +40,12 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 
 	for _, v := range salesforceData {
 		for _, x := range aggregatedData {
-			if v.Website != x.Website && v.SiteId != x.SiteId {
+			fmt.Printf("WebsiteSF: %s WebsiteMB: %s", v.Website, x.Website)
+			fmt.Println()
+			if !exists(v.SiteId, v.Website, aggregatedData) {
+				fmt.Println("New Site Added: ", v.Website)
 				aggregatedData = append(aggregatedData, v)
+				break
 			}
 		}
 	}
@@ -57,6 +62,18 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 	return json.Marshal(msg)
 }
 
+// helper functions
+
+func exists(id string, website string, data []*common.AccountInfo) (result bool) {
+	result = false
+	for _, account := range data {
+		if account.SiteId == id || account.Website == website {
+			result = true
+			break
+		}
+	}
+	return result
+}
 
 // cleaning account arrays
 

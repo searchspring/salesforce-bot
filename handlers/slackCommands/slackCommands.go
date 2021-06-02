@@ -130,7 +130,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
-		responseJSON, err := salesForceDAO.IDQuery(s.Text)
+		responseJSON, err := salesForceDAO.Query(s.Text)
 		if err != nil {
 			common.SendInternalServerError(w, err)
 			return

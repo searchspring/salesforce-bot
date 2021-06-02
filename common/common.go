@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/nlopes/slack"
+	"github.com/searchspring/nebo/models"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -26,20 +27,6 @@ type EnvVars struct {
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
 	MetabaseUser           string `split_words:"true" required:"false"`
 	MetabasePassword       string `split_words:"true" required:"false"`
-}
-
-type AccountInfo struct {
-	Website     string
-	Manager     string
-	Active      string
-	MRR         float64
-	FamilyMRR   float64
-	Platform    string
-	Integration string
-	Provider    string
-	SiteId      string
-	City        string
-	State       string
 }
 
 // Platforms is a list of platforms in salesforce
@@ -172,7 +159,7 @@ func (c *Client) AuthorizedGetWithCache(token string, url string, useCache bool)
 // formats AccountInfo into Slack Message
 
 // example formatting here: https://api.slack.com/reference/messaging/attachments
-func FormatAccountInfos(accountInfos []*AccountInfo, search string) *slack.Msg {
+func FormatAccountInfos(accountInfos []*models.AccountInfo, search string) *slack.Msg {
 	initialText := "Reps for search: " + search
 	if len(accountInfos) == 0 {
 		initialText = "No results for: " + search

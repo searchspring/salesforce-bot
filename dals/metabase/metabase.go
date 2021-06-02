@@ -9,22 +9,21 @@ import (
 	"github.com/grokify/go-metabase/metabase"
 	"github.com/grokify/go-metabase/metabaseutil"
 	metabaseOAuth "github.com/grokify/oauth2more/metabase"
-	"github.com/grokify/simplego/fmt/fmtutil"
-	common "github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/models"
 )
 
 type DAO interface {
 	QueryAll() ([]byte, error)
 	QueryNPS(string) (*NpsInfo, error)
-	Query(string) ([]*common.AccountInfo, error)
+	Query(string) ([]*models.AccountInfo, error)
 	StructFromResult(*metabase.DatasetQueryResultsData) (*NpsInfo, error)
-	ResultToMessage(string, *metabase.DatasetQueryResultsData) ([]*common.AccountInfo, error)
+	ResultToMessage(string, *metabase.DatasetQueryResultsData) ([]*models.AccountInfo, error)
 	GetSearchKey() string
 }
 
 type DAOImpl struct {
 	Client *metabase.APIClient
-	Key string
+	Key    string
 }
 
 type NpsInfo struct {
@@ -118,7 +117,7 @@ func (s *DAOImpl) QueryNPS(search string) (*NpsInfo, error) {
 	return s.StructFromResult(&info.Data)
 }
 
-func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
+func (s *DAOImpl) Query(search string) ([]*models.AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -133,10 +132,10 @@ func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
 	info, resp, err := metabaseutil.QuerySQL(s.Client, databaseId, q)
 	if err != nil {
 		log.Fatal(err)
-		return []*common.AccountInfo{}, err
+		return []*models.AccountInfo{}, err
 	} else if resp.StatusCode >= 300 {
 		log.Println(fmt.Sprintf("STATUS_CODE [%v]", resp.StatusCode))
-		return []*common.AccountInfo{}, err
+		return []*models.AccountInfo{}, err
 	}
 
 	return s.ResultToMessage(sanitized, &info.Data)
@@ -146,9 +145,9 @@ func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
 
 func (s *DAOImpl) StructFromResult(result *metabase.DatasetQueryResultsData) (*NpsInfo, error) {
 	account := &NpsInfo{
-		MRR: float64(-1),
+		MRR:       float64(-1),
 		FamilyMRR: float64(-1),
-		Manager: "Unknown",
+		Manager:   "Unknown",
 	}
 
 	for i := range result.Rows {
@@ -159,7 +158,6 @@ func (s *DAOImpl) StructFromResult(result *metabase.DatasetQueryResultsData) (*N
 				account.MRR = float64(0)
 				if value != nil {
 					account.MRR = value.(float64)
-					fmt.Println("MRR: ", value)
 				}
 			case "familyMrr":
 				account.FamilyMRR = float64(0)
@@ -176,14 +174,13 @@ func (s *DAOImpl) StructFromResult(result *metabase.DatasetQueryResultsData) (*N
 		if account.MRR != 0 || account.FamilyMRR != 0 {
 			break
 		}
-	} 
+	}
 
 	return account, nil
 }
 
-func (s *DAOImpl) ResultToMessage(search string, result *metabase.DatasetQueryResultsData) ([]*common.AccountInfo, error) {
-	accounts := []*common.AccountInfo{}
-	fmtutil.PrintJSON(result)
+func (s *DAOImpl) ResultToMessage(search string, result *metabase.DatasetQueryResultsData) ([]*models.AccountInfo, error) {
+	accounts := []*models.AccountInfo{}
 	if len(result.Rows) > 0 {
 		for i := range result.Rows {
 			website := "unknown"
@@ -238,7 +235,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *metabase.DatasetQueryRe
 					}
 				}
 			}
-			accounts = append(accounts, &common.AccountInfo{
+			accounts = append(accounts, &models.AccountInfo{
 				Website:     website,
 				Manager:     csm,
 				Active:      active,

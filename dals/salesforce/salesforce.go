@@ -6,14 +6,14 @@ import (
 	"regexp"
 
 	common "github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/models"
 	"github.com/simpleforce/simpleforce"
 )
 
 // DAO acts as the salesforce DAO
 type DAO interface {
-	Query(query string) ([]*common.AccountInfo, error)
-	IDQuery(search string) ([]*common.AccountInfo, error)
-	ResultToMessage(query string, result *simpleforce.QueryResult) ([]*common.AccountInfo, error)
+	Query(query string) ([]*models.AccountInfo, error)
+	ResultToMessage(query string, result *simpleforce.QueryResult) ([]*models.AccountInfo, error)
 	GetSearchKey() string
 }
 
@@ -44,7 +44,7 @@ func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO 
 	}
 }
 
-func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
+func (s *DAOImpl) Query(search string) ([]*models.AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -63,25 +63,8 @@ func (s *DAOImpl) Query(search string) ([]*common.AccountInfo, error) {
 	return s.ResultToMessage(sanitized, result)
 }
 
-func (s *DAOImpl) IDQuery(search string) ([]*common.AccountInfo, error) {
-	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
-	if err != nil {
-		return nil, err
-	}
-
-	sanitized := reg.ReplaceAllString(search, "")
-
-	q := "SELECT " + selectFields + " " +
-		"FROM Account WHERE Type IN ('Customer', 'Inactive Customer') AND Tracking_Code__c = '" + sanitized + "' ORDER BY Chargify_MRR__c DESC"
-	result, err := s.Client.Query(q)
-	if err != nil {
-		return nil, err
-	}
-	return s.ResultToMessage(sanitized, result)
-}
-
-func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]*common.AccountInfo, error) {
-	accounts := []*common.AccountInfo{}
+func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]*models.AccountInfo, error) {
+	accounts := []*models.AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -126,7 +109,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			state = fmt.Sprintf("%s", record["BillingState"])
 		}
 
-		accounts = append(accounts, &common.AccountInfo{
+		accounts = append(accounts, &models.AccountInfo{
 			Website:     fmt.Sprintf("%s", record["Website"]),
 			Manager:     managerName,
 			Active:      active,

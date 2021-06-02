@@ -9,6 +9,9 @@ import (
 	"strings"
 
 	"github.com/nlopes/slack"
+	"github.com/searchspring/nebo/models"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 type EnvVars struct {
@@ -151,4 +154,53 @@ func (c *Client) AuthorizedGetWithCache(token string, url string, useCache bool)
 	}
 	c.cache[url] = body
 	return body, nil
+}
+
+// formats AccountInfo into Slack Message
+
+// example formatting here: https://api.slack.com/reference/messaging/attachments
+func FormatAccountInfos(accountInfos []*models.AccountInfo, search string) *slack.Msg {
+	initialText := "Reps for search: " + search
+	if len(accountInfos) == 0 {
+		initialText = "No results for: " + search
+	}
+
+	p := message.NewPrinter(language.English)
+
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeInChannel,
+		Text:         initialText,
+		Attachments:  []slack.Attachment{},
+	}
+	globalFamilyMrr := float64(0)
+	for _, ai := range accountInfos {
+		color := "3A23AD" // Searchspring purple
+		if ai.Manager == "unknown" {
+			color = "FF0000" // red
+		}
+		mrr := "unknown"
+		if ai.MRR > 0 {
+			mrr = p.Sprintf("$%.2f", ai.MRR)
+		}
+		familymrr := "unknown"
+		if ai.FamilyMRR > 0 {
+			globalFamilyMrr = ai.FamilyMRR
+			familymrr = p.Sprintf("$%.2f", ai.FamilyMRR)
+		} else {
+			familymrr = p.Sprintf("$%.2f", globalFamilyMrr)
+		}
+
+		mrr = mrr + " (Family MRR: " + familymrr + ")"
+		loc := ai.City
+		if ai.State != "unknown" {
+			loc += ", " + ai.State
+		}
+		text := "Rep: " + ai.Manager + "\nMRR: " + mrr + "\nPlatform: " + ai.Platform + "\nIntegration: " + ai.Integration + "\nProvider: " + ai.Provider + "\nLocation: " + loc
+		msg.Attachments = append(msg.Attachments, slack.Attachment{
+			Color:      "#" + color,
+			Text:       text,
+			AuthorName: ai.Website + " (" + ai.Active + ") (SiteId: " + ai.SiteId + ")",
+		})
+	}
+	return msg
 }

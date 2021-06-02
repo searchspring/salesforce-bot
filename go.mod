@@ -9,6 +9,7 @@ require (
 	github.com/gorilla/schema v1.2.0
 	github.com/grokify/go-metabase v0.0.1
 	github.com/grokify/oauth2more v0.4.4
+	github.com/grokify/simplego v0.0.22
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nlopes/slack v0.6.0
 	github.com/simpleforce/simpleforce v0.0.0-20201016131803-2062cbbdbb89

@@ -13,8 +13,8 @@ import (
 	"github.com/gorilla/schema"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/nlopes/slack"
-	"github.com/searchspring/nebo/dals/salesforce"
 	"github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/dals/metabase"
 )
 
 type NpsMessage struct {
@@ -28,7 +28,7 @@ type NpsMessage struct {
 var router *mux.Router
 var env common.EnvVars
 
-var decoder = schema.NewDecoder()  
+var decoder = schema.NewDecoder()
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	err := envconfig.Process("", &env)
@@ -61,23 +61,23 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 func CreateRouter() (*mux.Router, error) {
 	router := mux.NewRouter()
-	salesforceDAOReal := salesforce.NewDAO(env.SfURL, env.SfUser, env.SfPassword, env.SfToken)
-	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &common.SlackDAOImpl{}, salesforceDAOReal)).Methods(http.MethodGet, http.MethodOptions)
+	metabaseDAO := metabase.NewDAO("https://metabase.kube.searchspring.io/", env.MetabaseUser, env.MetabasePassword, "")
+	router.HandleFunc("/nps", wrapSendNPSMessage(SendNPSMessage, &common.SlackDAOImpl{}, metabaseDAO)).Methods(http.MethodGet, http.MethodOptions)
 	router.Use(mux.CORSMethodMiddleware(router))
 	return router, nil
 }
 
-func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi common.SlackDAO, salesforceDAOReal salesforce.DAO), slackApi common.SlackDAO, salesforceDAOReal salesforce.DAO) func(w http.ResponseWriter, r *http.Request) {
+func wrapSendNPSMessage(apiRequest func(w http.ResponseWriter, r *http.Request, slackApi common.SlackDAO, metabaseDAO metabase.DAO), slackApi common.SlackDAO, metabaseDAO metabase.DAO) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if r.Method == http.MethodOptions {
 			return
 		}
-		apiRequest(w, r, slackApi, salesforceDAOReal)
+		apiRequest(w, r, slackApi, metabaseDAO)
 	}
 }
 
-func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.SlackDAO, salesforceApi salesforce.DAO) {
+func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.SlackDAO, metabaseDAO metabase.DAO) {
 
 	var nps NpsMessage
 
@@ -88,12 +88,11 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 	}
 
 	query := strings.Split(nps.Website, ".")[0]
-	responseData, err := salesforceApi.NPSQuery(query)
+	responseData, err := metabaseDAO.QueryNPS(query)
 	if err != nil {
 		common.SendInternalServerError(w, err)
 		return
 	}
-
 
 	attachments, err := createSlackAttachment(nps, responseData)
 	if err != nil {
@@ -108,11 +107,15 @@ func SendNPSMessage(w http.ResponseWriter, r *http.Request, slackApi common.Slac
 	}
 }
 
-func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountInfo) (slack.Attachment, error) {
+func createSlackAttachment(nps NpsMessage, metabaseData *metabase.NpsInfo) (slack.Attachment, error) {
 	mrr, rep := "Unknown", "Unknown"
-	if len(salesforceData) > 0 {
-		mrr = "$" + humanize.Comma(int64(salesforceData[0].FamilyMRR))
-		rep = salesforceData[0].Manager
+	if metabaseData.MRR != -1 {
+		if metabaseData.MRR == 0 {
+			mrr = "$" + humanize.Comma(int64(metabaseData.FamilyMRR))
+		} else {
+			mrr = "$" + humanize.Comma(int64(metabaseData.MRR))
+		}
+		rep = metabaseData.Manager
 	}
 	red := "#eb0101"
 	yellow := "#b8ba31"
@@ -137,7 +140,7 @@ func createSlackAttachment(nps NpsMessage, salesforceData []*salesforce.AccountI
 				Short: true,
 			},
 			{
-				Title: "Family MRR",
+				Title: "MRR",
 				Value: mrr,
 				Short: true,
 			},

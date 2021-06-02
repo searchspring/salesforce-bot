@@ -1,42 +1,19 @@
 package salesforce
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
-	"sort"
-	"strings"
 
-	"github.com/nlopes/slack"
 	common "github.com/searchspring/nebo/common"
+	"github.com/searchspring/nebo/models"
 	"github.com/simpleforce/simpleforce"
-
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 )
-
-type AccountInfo struct {
-	Website     string
-	Manager     string
-	Active      string
-	MRR         float64
-	FamilyMRR   float64
-	Platform    string
-	Integration string
-	Provider    string
-	SiteId      string
-	City        string
-	State       string
-}
 
 // DAO acts as the salesforce DAO
 type DAO interface {
-	Query(query string) ([]byte, error)
-	IDQuery(query string) ([]byte, error)
-	ResultToMessage(query string, result *simpleforce.QueryResult) ([]byte, error)
-	NPSQuery(query string) ([]*AccountInfo, error)
-	StructFromResult(query string, result *simpleforce.QueryResult) ([]*AccountInfo, error)
+	Query(query string) ([]*models.AccountInfo, error)
+	ResultToMessage(query string, result *simpleforce.QueryResult) ([]*models.AccountInfo, error)
 	GetSearchKey() string
 }
 
@@ -67,7 +44,7 @@ func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO 
 	}
 }
 
-func (s *DAOImpl) Query(search string) ([]byte, error) {
+func (s *DAOImpl) Query(search string) ([]*models.AccountInfo, error) {
 	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
 	if err != nil {
 		return nil, err
@@ -86,25 +63,8 @@ func (s *DAOImpl) Query(search string) ([]byte, error) {
 	return s.ResultToMessage(sanitized, result)
 }
 
-func (s *DAOImpl) IDQuery(search string) ([]byte, error) {
-	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
-	if err != nil {
-		return nil, err
-	}
-
-	sanitized := reg.ReplaceAllString(search, "")
-
-	q := "SELECT " + selectFields + " " +
-		"FROM Account WHERE Type IN ('Customer', 'Inactive Customer') AND Tracking_Code__c = '" + sanitized + "' ORDER BY Chargify_MRR__c DESC"
-	result, err := s.Client.Query(q)
-	if err != nil {
-		return nil, err
-	}
-	return s.ResultToMessage(sanitized, result)
-}
-
-func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]byte, error) {
-	accounts := []*AccountInfo{}
+func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]*models.AccountInfo, error) {
+	accounts := []*models.AccountInfo{}
 	for _, record := range result.Records {
 		manager := record["CS_Manager__r"]
 		managerName := "unknown"
@@ -149,7 +109,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			state = fmt.Sprintf("%s", record["BillingState"])
 		}
 
-		accounts = append(accounts, &AccountInfo{
+		accounts = append(accounts, &models.AccountInfo{
 			Website:     fmt.Sprintf("%s", record["Website"]),
 			Manager:     managerName,
 			Active:      active,
@@ -163,160 +123,10 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			State:       state,
 		})
 	}
-	accounts = cleanAccounts(accounts)
-	if !isPlatformSearch(search) {
-		accounts = sortAccounts(accounts)
-	}
-	accounts = truncateAccounts(accounts)
-	msg := formatAccountInfos(accounts, search)
-	return json.Marshal(msg)
-}
 
-// nps functions
-func (s *DAOImpl) NPSQuery(search string) ([]*AccountInfo, error) {
-	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
-	if err != nil {
-		return nil, err
-	}
-
-	sanitized := reg.ReplaceAllString(search, "")
-
-	q := "SELECT " + selectFields + " " +
-		"FROM Account WHERE Type IN ('Customer', 'Inactive Customer') " +
-		"AND (Website LIKE '%" + sanitized + "%' OR Platform__c LIKE '%" + sanitized +
-		"%' OR Tracking_Code__c = '" + sanitized + "') ORDER BY Chargify_MRR__c DESC"
-	result, err := s.Client.Query(q)
-	if err != nil {
-		return nil, err
-	}
-	return s.StructFromResult(sanitized, result)
-}
-
-func (s *DAOImpl) StructFromResult(search string, result *simpleforce.QueryResult) ([]*AccountInfo, error) {
-	accounts := []*AccountInfo{}
-	for _, record := range result.Records {
-		manager := record["CS_Manager__r"]
-		managerName := "unknown"
-		if manager != nil {
-			if mapName, ok := (manager.(map[string]interface{}))["Name"]; ok {
-				managerName = fmt.Sprintf("%s", mapName)
-			}
-		}
-		Type := record["Type"]
-		active := "Active"
-		if Type != "Customer" {
-			active = "Not active"
-		}
-		mrr := float64(-1)
-		if record["Chargify_MRR__c"] != nil {
-			mrr = record["Chargify_MRR__c"].(float64)
-		}
-
-		familymrr := float64(-1)
-		if record["Family_MRR__c"] != nil {
-			familymrr = record["Family_MRR__c"].(float64)
-		}
-
-		accounts = append(accounts, &AccountInfo{
-			Manager:   managerName,
-			Active:    active,
-			MRR:       mrr,
-			FamilyMRR: familymrr,
-		})
-	}
-	accounts = cleanAccounts(accounts)
-	if !isPlatformSearch(search) {
-		accounts = sortAccounts(accounts)
-	}
-	accounts = truncateAccounts(accounts)
 	return accounts, nil
 }
 
 func (s *DAOImpl) GetSearchKey() string {
 	return ""
-}
-
-func truncateAccounts(accounts []*AccountInfo) []*AccountInfo {
-	truncated := []*AccountInfo{}
-	for i, account := range accounts {
-		if i == 20 {
-			break
-		}
-		truncated = append(truncated, account)
-	}
-	return truncated
-}
-func isPlatformSearch(search string) bool {
-	for _, platform := range common.Platforms {
-		if strings.EqualFold(search, platform) {
-			return true
-		}
-	}
-	return false
-}
-
-// example formatting here: https://api.slack.com/reference/messaging/attachments
-func formatAccountInfos(accountInfos []*AccountInfo, search string) *slack.Msg {
-	initialText := "Reps for search: " + search
-	if len(accountInfos) == 0 {
-		initialText = "No results for: " + search
-	}
-
-	p := message.NewPrinter(language.English)
-
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeInChannel,
-		Text:         initialText,
-		Attachments:  []slack.Attachment{},
-	}
-	for _, ai := range accountInfos {
-		color := "3A23AD" // Searchspring purple
-		if ai.Manager == "unknown" {
-			color = "FF0000" // red
-		}
-		mrr := "unknown"
-		if ai.MRR != -1 {
-			mrr = p.Sprintf("$%.2f", ai.MRR)
-		}
-		familymrr := "unknown"
-		if ai.FamilyMRR != -1 {
-			familymrr = p.Sprintf("$%.2f", ai.FamilyMRR)
-		}
-		mrr = mrr + " (Family MRR: " + familymrr + ")"
-		loc := ai.City
-		if ai.State != "unknown" {
-			loc += ", " + ai.State
-		} 
-		loc = ai.City + ", " + ai.State
-		text := "Rep: " + ai.Manager + "\nMRR: " + mrr + "\nPlatform: " + ai.Platform + "\nIntegration: " + ai.Integration + "\nProvider: " + ai.Provider + "\nLocation: " + loc
-		msg.Attachments = append(msg.Attachments, slack.Attachment{
-			Color:      "#" + color,
-			Text:       text,
-			AuthorName: ai.Website + " (" + ai.Active + ") (SiteId: " + ai.SiteId + ")",
-		})
-	}
-	return msg
-}
-
-func cleanAccounts(accounts []*AccountInfo) []*AccountInfo {
-	for _, account := range accounts {
-		w := account.Website
-		if strings.HasPrefix(w, "http://") || strings.HasPrefix(w, "https://") {
-			w = w[strings.Index(w, ":")+3:]
-		}
-		if strings.HasPrefix(w, "www.") {
-			w = w[4:]
-		}
-		if strings.HasSuffix(w, "/") {
-			w = w[0 : len(w)-1]
-		}
-		account.Website = w
-	}
-	return accounts
-}
-func sortAccounts(accounts []*AccountInfo) []*AccountInfo {
-	sort.Slice(accounts, func(i, j int) bool {
-		return len(accounts[i].Website) < len(accounts[j].Website)
-	})
-	return accounts
 }

@@ -57,6 +57,15 @@ Nebo is a being of many talents. Abilities/roles include:
 - Install vercel `npm install -g vercel`
 - Install ngrok `npm install -g ngrok` (because we were too lazy to mock things)
 
+### Signing into the Vercel CLI and setting up your project **(Only First Time Setup)**
+
+1. ```vercel login```
+2. Enter email: "machine@searchspring.com"
+3. Go to https://groups.google.com/a/searchspring.com/g/machine and click the link in the confirmation email, then return to terminal
+4. Run ```vercel dev``` and you will be prompted with _Setup and develop (root folder)? (Y/n)_ choose Y
+5. You will then be asked to choose a _scope_. Choose _machine_
+6. It should then prompt _Found machine/(project_name) Link to it? (Y/n)_ Choose Y and you should be running now on http://localhost:3000  
+
 ### Run locally
 1. Create a .env file for local development
     ```properties

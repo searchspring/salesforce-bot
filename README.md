@@ -4,9 +4,15 @@ Say hello to Nebo (Nebulous Cloud Being)
 
 <img style="border-radius: 20px; box-shadow: 3px 3px 5px 0px rgba(173,154,173,1);" src="https://www.gravatar.com/avatar/1abed234f87b8153b2cda61601fbb1f9.jpg">
 
-Nebo is a slackbot that helps us ask salesforce questions without having to go into salesforce.
+Nebo is a being of many talents. Abilities/roles include:
+- Slackbot. Nebo helps find data on our customers without needing to go to the database.
+- NPS Bot. Nebo sends NPS ratings and feedback from the SMC to the #nps slack channel.
+- Supplies a list of all our customers siteID's and Domain Names for the [SiteIDToDomainName](https://chrome.google.com/webstore/detail/siteid-to-domain/ggmcjkngfgckplleegapeifknomknkeh?hl=en) Chrome Extension
+- Listens for new channels to be created to share in a new channels channel in slack
 
-## Usage
+# Usage - Base URL https://salesforce-bot.vercel.app/
+
+## Slack Commands 💻
 - `/nebo shoes.com`
 - `/nebo bigcommerce`
 - `/neboidnx A21BCDE5FE33` - find a customer with this key in the Nextopia system
@@ -16,13 +22,49 @@ Nebo is a slackbot that helps us ask salesforce questions without having to go i
 - `/firedown` - fire over checklist
 - `/meet` - generate a randomly named meeting invite
 
-## Development
+## NPS Endpoint 📋
+
+#### Endpoint starts at `/nps` with 3 manditory fields
+- `name` (string)
+- `email` (string)
+- `website` (string)
+
+#### and 2 interchangable fields
+*If both fields are used in the same request, the feedback will be overwritten by the rating so only use ONE at a time* 
+- `rating` (int)
+- `feedback` (string)
+
+
+### Examples
+1. This would be an example to post a message with a rating `/nps?name=clientName&email=clientEmail&website=clientWebsite&rating=clientRating`
+2. This would be an example to post a message with feedback `/nps?name=clientName&email=clientEmail&website=clientWebsite&feedback=clientFeedback`
+
+## ListSites Endpoint 📝
+
+#### Endpoint is `/listSites` with no fields
+- Request: All requests to this endpoint require an authorization header with a [GoogleOAuth Token](https://developers.google.com/identity/protocols/oauth2) attached
+- Response: After the auth token is verifed, nebo will send back an array of objects that look like `{Website: "test.com", SiteID: "abc123"}
+
+## New Channel Listener 👂
+
+#### Nebo is always listening for new channels and will post a link to them in the [#new-channels](https://searchspring.slack.com/archives/C01VD4Z343B) channel.
+
+# Development
 
 ### Prerequisites
 - Install Go https://golang.org/doc/install
 - Install Node https://nodejs.org/en/download/
 - Install vercel `npm install -g vercel`
 - Install ngrok `npm install -g ngrok` (because we were too lazy to mock things)
+
+### Signing into the Vercel CLI and setting up your project **(Only First Time Setup)**
+
+1. ```vercel login```
+2. Enter email: "machine@searchspring.com"
+3. Go to https://groups.google.com/a/searchspring.com/g/machine and click the link in the confirmation email, then return to terminal
+4. Run ```vercel dev``` and you will be prompted with _Setup and develop (root folder)? (Y/n)_ choose Y
+5. You will then be asked to choose a _scope_. Choose _machine_
+6. It should then prompt _Found machine/(project_name) Link to it? (Y/n)_ Choose Y and you should be running now on http://localhost:3000  
 
 ### Run locally
 1. Create a .env file for local development
@@ -31,6 +73,8 @@ Nebo is a slackbot that helps us ask salesforce questions without having to go i
     SF_USER=<sf login email>
     SF_PASSWORD=<sf password>
     SF_TOKEN=<sf token>
+    METABASE_USER=<metabase login email>
+    METABASE_PASSWORD=<metabase password>
     SLACK_VERIFICATION_TOKEN=<slack token>
     SLACK_OAUTH_TOKEN=<slack oauth token>
     NX_USER=<nx user>
@@ -72,26 +116,7 @@ go test ./...
     vercel --prod
     ```
 
-
-## NPS Endpoint Docs 📋
-
-#### Endpoint starts at `/nps` with 3 manditory fields
-- `name` (string)
-- `email` (string)
-- `website` (string)
-
-#### and 2 interchangable fields
-*If both fields are used in the same request, the feedback will be overwritten by the rating so only use ONE at a time* 
-- `rating` (int)
-- `feedback` (string)
-
-<hr>
-
-### Examples 🧰
-1. This would be an example to post a message with a rating `/nps?name=clientName&email=clientEmail&website=clientWebsite&rating=clientRating`
-2. This would be an example to post a message with feedback `/nps?name=clientName&email=clientEmail&website=clientWebsite&feedback=clientFeedback`
-
-### Help/Issues/Feature Requests 🙋
+## Help/Issues/Feature Requests 🙋
 If you need help with the api, have questions, or an idea for a new feature, please either: 
 - Add an issue [HERE](https://github.com/searchspring/nebo/issues/new)  
 - Post a message in [Development Nebo](https://searchspring.slack.com/archives/C01N8NERZ7S)

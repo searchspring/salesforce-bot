@@ -53,8 +53,7 @@ func (s *DAOImpl) Query(search string) ([]*models.AccountInfo, error) {
 	sanitized := reg.ReplaceAllString(search, "")
 
 	q := "SELECT " + selectFields + " " +
-		"FROM Account WHERE Type IN ('Customer', 'Inactive Customer') " +
-		"AND (Website LIKE '%" + sanitized + "%' OR Platform__c LIKE '%" + sanitized +
+		"FROM Account WHERE (Website LIKE '%" + sanitized + "%' OR Platform__c LIKE '%" + sanitized +
 		"%' OR Tracking_Code__c = '" + sanitized + "') ORDER BY Chargify_MRR__c DESC"
 	result, err := s.Client.Query(q)
 	if err != nil {
@@ -73,7 +72,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 				managerName = fmt.Sprintf("%s", mapName)
 			}
 		}
-		Type := record["Type"]
+		Type := fmt.Sprintf("%s", record["Type"])
 		active := "Active"
 		if Type != "Customer" {
 			active = "Not active"
@@ -113,6 +112,7 @@ func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult
 			Website:     fmt.Sprintf("%s", record["Website"]),
 			Manager:     managerName,
 			Active:      active,
+			Type:        Type,
 			MRR:         mrr,
 			FamilyMRR:   familymrr,
 			Platform:    platform,

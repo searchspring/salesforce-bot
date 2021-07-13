@@ -36,11 +36,25 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 		return nil, nil
 	}
 
-	aggregatedData = append(aggregatedData, metabaseData...)
+	for _, v := range metabaseData {
+		e, i := exists(v.SiteId, v.Website, salesforceData)
+		if e {
+			if salesforceData[i].Type == "Prospect" {
+				continue
+			} else {
+				aggregatedData = append(aggregatedData, v)
+			}
+		} else {
+			aggregatedData = append(aggregatedData, v)
+		}
+	}
 
 	for _, v := range salesforceData {
-		if !exists(v.SiteId, v.Website, aggregatedData) {
-			aggregatedData = append(aggregatedData, v)
+		e, _ := exists(v.SiteId, v.Website, aggregatedData) 
+		if !e {
+			if v.Type != "Prospect" {
+				aggregatedData = append(aggregatedData, v)
+			}
 		}
 	}
 
@@ -49,7 +63,6 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 		aggregatedData = sortAccounts(aggregatedData, "website")
 	}
 	aggregatedData = truncateAccounts(aggregatedData)
-
 	aggregatedData = sortAccounts(aggregatedData, "mrr")
 
 	msg := common.FormatAccountInfos(aggregatedData, search)
@@ -58,15 +71,17 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 
 // helper functions
 
-func exists(id string, website string, data []*models.AccountInfo) (result bool) {
+func exists(id string, website string, data []*models.AccountInfo) (result bool, index int) {
 	result = false
-	for _, account := range data {
+	index = -1
+	for i, account := range data {
 		if account.Website == website || account.SiteId == id && id != "unknown" {
+			index = i
 			result = true
 			break
 		}
 	}
-	return result
+	return result, index
 }
 
 // cleaning account arrays

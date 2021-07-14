@@ -36,12 +36,13 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 		return nil, nil
 	}
 
+	/* add all metabase data to the final array that A) Doesn't have a corrisponding document in SF
+	   B) Has a corrisponding document in SF as long as the SF document is of type Customer or Inactive Customer
+	*/
 	for _, v := range metabaseData {
 		e, i := exists(v.SiteId, v.Website, salesforceData)
 		if e {
-			if salesforceData[i].Type == "Prospect" {
-				continue
-			} else {
+			if salesforceData[i].Type == "Customer" || salesforceData[i].Type == "Inactive Customer" {
 				aggregatedData = append(aggregatedData, v)
 			}
 		} else {
@@ -49,10 +50,11 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 		}
 	}
 
+	// add all salesforce data to the final array that doesn't already exist in the final array and is of type Customer or Inactive Customer
 	for _, v := range salesforceData {
 		e, _ := exists(v.SiteId, v.Website, aggregatedData) 
 		if !e {
-			if v.Type != "Prospect" {
+			if v.Type == "Customer" || v.Type == "Inactive Customer" {
 				aggregatedData = append(aggregatedData, v)
 			}
 		}

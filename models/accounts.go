@@ -1,10 +1,10 @@
 package models
 
-
 type AccountInfo struct {
 	Website     string
 	Manager     string
 	Active      string
+	Type        string
 	MRR         float64
 	FamilyMRR   float64
 	Platform    string

@@ -25,8 +25,6 @@ type AggregateServiceImpl struct {
 }
 
 func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
-	var aggregatedData []*models.AccountInfo
-
 	metabaseData, err := d.Deps.MetabaseDAO.Query(search)
 	if err != nil {
 		return nil, nil
@@ -36,20 +34,14 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 		return nil, nil
 	}
 
-	aggregatedData = append(aggregatedData, metabaseData...)
-
-	for _, v := range salesforceData {
-		if !exists(v.SiteId, v.Website, aggregatedData) {
-			aggregatedData = append(aggregatedData, v)
-		}
-	}
+	aggregatedData := addMetabaseAccounts(metabaseData, salesforceData)
+	aggregatedData = addSalesforceAccounts(aggregatedData, salesforceData)
 
 	aggregatedData = cleanAccounts(aggregatedData)
 	if !isPlatformSearch(search) {
 		aggregatedData = sortAccounts(aggregatedData, "website")
 	}
-	aggregatedData = truncateAccounts(aggregatedData)
-
+	aggregatedData = truncateToTwenty(aggregatedData)
 	aggregatedData = sortAccounts(aggregatedData, "mrr")
 
 	msg := common.FormatAccountInfos(aggregatedData, search)
@@ -58,20 +50,45 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 
 // helper functions
 
-func exists(id string, website string, data []*models.AccountInfo) (result bool) {
-	result = false
-	for _, account := range data {
-		if account.Website == website || account.SiteId == id && id != "unknown" {
-			result = true
-			break
+func addMetabaseAccounts(metabaseData []*models.AccountInfo, salesforceData []*models.AccountInfo) []*models.AccountInfo {
+	var customerData []*models.AccountInfo
+	for _, v := range metabaseData {
+		e, i := exists(v.SiteId, v.Website, salesforceData)
+		if e {
+			if salesforceData[i].Type == "Customer" || salesforceData[i].Type == "Inactive Customer" {
+				customerData = append(customerData, v)
+			}
+		} else {
+			customerData = append(customerData, v)
 		}
 	}
-	return result
+	return customerData
+}
+
+func addSalesforceAccounts(currentCustomerData []*models.AccountInfo, salesforceData []*models.AccountInfo) []*models.AccountInfo {
+	for _, v := range salesforceData {
+		e, _ := exists(v.SiteId, v.Website, currentCustomerData) 
+		if !e {
+			if v.Type == "Customer" || v.Type == "Inactive Customer" {
+				currentCustomerData = append(currentCustomerData, v)
+			}
+		}
+	}
+	return currentCustomerData
+}
+
+func exists(id string, website string, data []*models.AccountInfo) (result bool, index int) {
+	for i, account := range data {
+		if account.Website == website || account.SiteId == id && id != "unknown" {
+			return true, i
+		}
+	}
+	return false, -1
 }
 
 // cleaning account arrays
 
-func truncateAccounts(accounts []*models.AccountInfo) []*models.AccountInfo {
+func truncateToTwenty(accounts []*models.AccountInfo) []*models.AccountInfo {
 	truncated := []*models.AccountInfo{}
 	for i, account := range accounts {
 		if i == 20 {

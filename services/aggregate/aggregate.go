@@ -41,7 +41,7 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 	if !isPlatformSearch(search) {
 		aggregatedData = sortAccounts(aggregatedData, "website")
 	}
-	aggregatedData = truncateAccounts(aggregatedData)
+	aggregatedData = truncateToTwenty(aggregatedData)
 	aggregatedData = sortAccounts(aggregatedData, "mrr")
 
 	msg := common.FormatAccountInfos(aggregatedData, search)
@@ -88,7 +88,7 @@ func exists(id string, website string, data []*models.AccountInfo) (result bool,
 
 // cleaning account arrays
 
-func truncateAccounts(accounts []*models.AccountInfo) []*models.AccountInfo {
+func truncateToTwenty(accounts []*models.AccountInfo) []*models.AccountInfo {
 	truncated := []*models.AccountInfo{}
 	for i, account := range accounts {
 		if i == 20 {

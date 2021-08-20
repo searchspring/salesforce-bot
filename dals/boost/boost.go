@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-
-
 type Site struct {
 	Status, Message, SiteId, Name string
 }
@@ -19,7 +17,7 @@ type Status struct {
 	lastExtractionDurationMinutes, lastGeneratorDurationMinutes                                 int
 }
 
-var boostAdminUrl = "https://boostadmin.azurewebsites.net"
+const boostAdminUrl = "https://boostadmin.azurewebsites.net"
 
 func RestartSites() {
 	restartSites(getHungSites())
@@ -35,7 +33,7 @@ func restartSites(sites []Site) {
 	}
 }
 
-func HandleStatusRequest(trackingCode string) map[string]string {
+func HandleStatusRequest(trackingCode string) map[string]interface{} {
 	url := boostAdminUrl + "/sites/" + trackingCode + "/status"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -43,7 +41,7 @@ func HandleStatusRequest(trackingCode string) map[string]string {
 	}
 	defer resp.Body.Close()
 	body, err2 := io.ReadAll(resp.Body)
-	var status = make(map[string]string)
+	var status = make(map[string]interface{})
 
 	if err2 != nil {
 		fmt.Println("Error parsing get status response")
@@ -53,7 +51,7 @@ func HandleStatusRequest(trackingCode string) map[string]string {
 	return status
 }
 
-func HandleGetExclusionStatsRequest(trackingCode string) map[string]string {
+func HandleGetExclusionStatsRequest(trackingCode string) map[string]interface{} {
 	url := boostAdminUrl + "/sites/" + trackingCode + "/exclusionStats"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -61,7 +59,7 @@ func HandleGetExclusionStatsRequest(trackingCode string) map[string]string {
 	}
 	defer resp.Body.Close()
 	body, err2 := io.ReadAll(resp.Body)
-	var stats = make(map[string]string)
+	var stats = make(map[string]interface{})
 
 	if err2 != nil {
 		fmt.Println("Error parsing exclusion stats response")

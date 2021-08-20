@@ -28,6 +28,9 @@ var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
 var metabaseDAO metabase.DAO = nil
 
+const meetHelpText = "Meet usage:\n`/meet` - generate a random meet\n`/meet name` - generate a meet with a name\n`/meet help` - this message"
+const neboidHelpText = "Neboid usage:\n`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n`/neboid help` - this message"
+
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
 	var env common.EnvVars
@@ -93,7 +96,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	case "/fire", "/firetest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpFire(w)
+			writeHelpText(w, "Fire usage:\n`/fire` - generate a fire checklist to handle the fire")
 			return
 		}
 		fireResponse(env.GdriveFireDocFolderID, s.ResponseURL)
@@ -144,26 +147,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "/boost", "/boosttest":
-		if strings.TrimSpace(s.Text) == "help" {
-			writeBoostHelp(w)
+		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
+			writeHelpText(w, boost.HelpText())
 			return
 		}
 
 		w.Write(handleBoostActions(s.Text))
 		return
 
-	case "/meet":
+	case "/meet", "/meettest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpMeet(w)
-			return
-		}
-		responseJSON := meetResponse(s.Text)
-		w.Write(responseJSON)
-		return
-
-	case "/meettest":
-		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpMeet(w)
+			writeHelpText(w, meetHelpText)
 			return
 		}
 		responseJSON := meetResponse(s.Text)
@@ -174,15 +168,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		common.SendInternalServerError(w, errors.New("unknown slash command "+s.Command))
 		return
 	}
-}
-
-func writeHelpFire(w http.ResponseWriter) {
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Fire usage:\n`/fire` - generate a fire checklist to handle the fire",
-	}
-	json, _ := json.Marshal(msg)
-	w.Write(json)
 }
 
 func writeHelpNebo(w http.ResponseWriter) {
@@ -203,27 +188,14 @@ func writeHelpNebo(w http.ResponseWriter) {
 	w.Write(json)
 }
 func writeHelpNeboid(w http.ResponseWriter) {
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Neboid usage:\n`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n`/neboid help` - this message",
-	}
-	json, _ := json.Marshal(msg)
-	w.Write(json)
+	writeHelpText(w, neboidHelpText)
 }
 
-func writeHelpMeet(w http.ResponseWriter) {
+/// Simple wrapper that sends help text to only the Slack user who requested it
+func writeHelpText(w http.ResponseWriter, helpText string) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Meet usage:\n`/meet` - generate a random meet\n`/meet name` - generate a meet with a name\n`/meet help` - this message",
-	}
-	json, _ := json.Marshal(msg)
-	w.Write(json)
-}
-
-func writeBoostHelp(w http.ResponseWriter) {
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeEphemeral,
-		Text: boostHelpText(),
+		Text:         helpText,
 	}
 	json, _ := json.Marshal(msg)
 	w.Write(json)
@@ -301,17 +273,17 @@ func handleBoostActions(rawUserInput string) []byte {
 		command := args[0]
 		if command == boost.SiteStatus {
 			status := boost.HandleStatusRequest(args[1])
-			msg.Text = formatMapResponse(status)
+			msg.Text = FormatMapResponse(status)
 		}
 		if command == boost.SiteRestart {
 			boost.RestartSite(args[1])
 
 			status := boost.HandleStatusRequest(args[1])
-			msg.Text = formatMapResponse(status)
+			msg.Text = FormatMapResponse(status)
 		}
-		if command == boost.SiteExclusionStats {
+		if command == boost.SiteExclusions {
 			stats := boost.HandleGetExclusionStatsRequest(args[1])
-			msg.Text = formatMapResponse(stats)
+			msg.Text = FormatMapResponse(stats)
 		}
 	default:
 		msg.ResponseType = slack.ResponseTypeEphemeral
@@ -321,10 +293,11 @@ func handleBoostActions(rawUserInput string) []byte {
 	return jsonResponse
 }
 
-func formatMapResponse(obj map[string]string) (text string) {
+func FormatMapResponse(obj map[string]interface{}) (text string) {
 	text += "```"
 	for key, val := range obj {
-		text += key + ": " + val + "\n"
+		stringVal := fmt.Sprintf("%v", val)
+		text += key + ": " + stringVal + "\n"
 	}
 	text += "```"
 	return

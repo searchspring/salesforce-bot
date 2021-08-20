@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/searchspring/nebo/dals/boost"
 	"log"
 	"math/rand"
 	"net/http"
@@ -21,7 +22,6 @@ import (
 	"github.com/searchspring/nebo/dals/metabase"
 	"github.com/searchspring/nebo/dals/nextopia"
 	"github.com/searchspring/nebo/dals/salesforce"
-
 )
 
 var salesForceDAO salesforce.DAO = nil
@@ -67,11 +67,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	aggregation := aggregate.AggregateServiceImpl{
 		Deps: &aggregate.Deps{
-			MetabaseDAO: metabaseDAO,
+			MetabaseDAO:   metabaseDAO,
 			SalesforceDAO: salesForceDAO,
 		},
 	}
-
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
@@ -144,6 +143,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.Write(byteRes)
 		return
 
+	case "/boost", "/boosttest":
+		if strings.TrimSpace(s.Text) == "help" {
+			writeBoostHelp(w)
+			return
+		}
+
+		w.Write(handleBoostActions(s.Text))
+		return
+
 	case "/meet":
 		if strings.TrimSpace(s.Text) == "help" {
 			writeHelpMeet(w)
@@ -212,6 +220,15 @@ func writeHelpMeet(w http.ResponseWriter) {
 	w.Write(json)
 }
 
+func writeBoostHelp(w http.ResponseWriter) {
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeEphemeral,
+		Text: boostHelpText(),
+	}
+	json, _ := json.Marshal(msg)
+	w.Write(json)
+}
+
 func meetResponse(search string) []byte {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
@@ -270,6 +287,47 @@ func fireDownResponse() []byte {
 	}
 	json, _ := json.Marshal(msg)
 	return json
+}
+
+func handleBoostActions(rawUserInput string) []byte {
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeInChannel,
+	}
+
+	args := strings.Split(rawUserInput, " ")
+
+	switch len(args) {
+	case 2:
+		command := args[0]
+		if command == boost.SiteStatus {
+			status := boost.HandleStatusRequest(args[1])
+			msg.Text = formatMapResponse(status)
+		}
+		if command == boost.SiteRestart {
+			boost.RestartSite(args[1])
+
+			status := boost.HandleStatusRequest(args[1])
+			msg.Text = formatMapResponse(status)
+		}
+		if command == boost.SiteExclusionStats {
+			stats := boost.HandleGetExclusionStatsRequest(args[1])
+			msg.Text = formatMapResponse(stats)
+		}
+	default:
+		msg.ResponseType = slack.ResponseTypeEphemeral
+		msg.Text = boost.HelpText()
+	}
+	jsonResponse, _ := json.Marshal(msg)
+	return jsonResponse
+}
+
+func formatMapResponse(obj map[string]string) (text string) {
+	text += "```"
+	for key, val := range obj {
+		text += key + ": " + val + "\n"
+	}
+	text += "```"
+	return
 }
 
 func timestamp(currentTime time.Time) string {

@@ -8,19 +8,14 @@ import (
 	"strings"
 )
 
+// Site BoostAdminApi response from /sites?status=hung
 type Site struct {
 	Status, Message, SiteId, Name string
 }
 
-// StatusResponse BoostAdminApi response from /sites/{siteId}/status
-type StatusResponse struct {
-	lastExtractionCompletion, lastGeneratorCompletion, overallStatus, message, lastLogTimestamp string
-	lastExtractionDurationMinutes, lastGeneratorDurationMinutes                                 int
-}
-
 const boostAdminUrl = "https://boostadmin.azurewebsites.net"
 
-func RestartSites() {
+func RestartHungSites() {
 	restartSites(getHungSites())
 }
 
@@ -88,7 +83,6 @@ func getHungSites() []Site {
 	defer resp.Body.Close()
 	body, err2 := io.ReadAll(resp.Body)
 
-
 	if err2 != nil {
 		fmt.Println("Error parsing list of sites")
 	} else {
@@ -98,7 +92,6 @@ func getHungSites() []Site {
 	}
 	return nil
 }
-
 
 func HelpText() string {
 	return "Try a command from this here list:\n\n" +

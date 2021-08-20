@@ -28,9 +28,6 @@ var salesForceDAO salesforce.DAO = nil
 var nextopiaDAO nextopia.DAO = nil
 var metabaseDAO metabase.DAO = nil
 
-const meetHelpText = "Meet usage:\n`/meet` - generate a random meet\n`/meet name` - generate a meet with a name\n`/meet help` - this message"
-const neboidHelpText = "Neboid usage:\n`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n`/neboid help` - this message"
-
 // Handler - check routing and call correct methods
 func Handler(w http.ResponseWriter, r *http.Request) {
 	var env common.EnvVars
@@ -157,7 +154,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	case "/meet", "/meettest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpText(w, meetHelpText)
+			writeHelpText(w, "Meet usage:\n"+
+				"`/meet` - generate a random meet\n"+
+				"`/meet name` - generate a meet with a name\n"+
+				"`/meet help` - this message")
 			return
 		}
 		responseJSON := meetResponse(s.Text)
@@ -188,10 +188,12 @@ func writeHelpNebo(w http.ResponseWriter) {
 	w.Write(json)
 }
 func writeHelpNeboid(w http.ResponseWriter) {
-	writeHelpText(w, neboidHelpText)
+	writeHelpText(w, "Neboid usage:\n"+
+		"`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n"+
+		"`/neboid help` - this message")
 }
 
-/// Simple wrapper that sends help text to only the Slack user who requested it
+// Simple wrapper that sends help text to only the Slack user who requested it
 func writeHelpText(w http.ResponseWriter, helpText string) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
@@ -204,13 +206,13 @@ func writeHelpText(w http.ResponseWriter, helpText string) {
 func meetResponse(search string) []byte {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
-		Text:         getMeetLink(search),
+		Text:         GetMeetLink(search),
 	}
 	json, _ := json.Marshal(msg)
 	return json
 }
 
-func getMeetLink(search string) string {
+func GetMeetLink(search string) string {
 	name := search
 	name = strings.ReplaceAll(name, " ", "-")
 	if strings.TrimSpace(search) == "" {
@@ -245,7 +247,7 @@ func fireChecklist(folderID string) string {
 		"4. Post link to the fire doc\n" +
 		"5. If a real fire - announcer posts to the <#C024FV14Z> channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
 		"6. Post a link to the fire document in the <#C024FV14Z> channel thread\n" +
-		"7. Fight! " + getMeetLink("fire-investigation-"+timestamp(time.Now())) + "\n\n\n" +
+		"7. Fight! " + GetMeetLink("fire-investigation-"+timestamp(time.Now())) + "\n\n\n" +
 		"8. Use `/firedown` when the fire is out\n"
 	return text
 }
@@ -293,6 +295,7 @@ func handleBoostActions(rawUserInput string) []byte {
 	return jsonResponse
 }
 
+// FormatMapResponse Return each key/value pair on a new line, together formatted as a block
 func FormatMapResponse(obj map[string]interface{}) (text string) {
 	text += "```"
 	for key, val := range obj {

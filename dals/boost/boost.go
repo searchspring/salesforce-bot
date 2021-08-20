@@ -12,7 +12,8 @@ type Site struct {
 	Status, Message, SiteId, Name string
 }
 
-type Status struct {
+// StatusResponse BoostAdminApi response from /sites/{siteId}/status
+type StatusResponse struct {
 	lastExtractionCompletion, lastGeneratorCompletion, overallStatus, message, lastLogTimestamp string
 	lastExtractionDurationMinutes, lastGeneratorDurationMinutes                                 int
 }

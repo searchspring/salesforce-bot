@@ -271,17 +271,17 @@ func handleBoostActions(rawUserInput string) []byte {
 	switch len(args) {
 	case 2:
 		command := args[0]
-		if command == boost.SiteStatus {
+		if command == boost.SlackCommands[boost.Status] {
 			status := boost.HandleStatusRequest(args[1])
 			msg.Text = FormatMapResponse(status)
 		}
-		if command == boost.SiteRestart {
+		if command == boost.SlackCommands[boost.Restart] {
 			boost.RestartSite(args[1])
 
 			status := boost.HandleStatusRequest(args[1])
 			msg.Text = FormatMapResponse(status)
 		}
-		if command == boost.SiteExclusions {
+		if command == boost.SlackCommands[boost.Exclusions] {
 			stats := boost.HandleGetExclusionStatsRequest(args[1])
 			msg.Text = FormatMapResponse(stats)
 		}

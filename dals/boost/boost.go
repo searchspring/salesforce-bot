@@ -3,8 +3,6 @@ package boost
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/searchspring/nebo/common"
 	"io"
 	"log"
 	"net/http"
@@ -81,13 +79,10 @@ func RestartSite(trackingCode string) {
 	log.Println("Restarted " + trackingCode)
 }
 
-
 func HandlePauseRequest(trackingCode string) (string, error) {
-	var env common.EnvVars
-	envconfig.Process("", &env)
-
-	azure := AzureStorage{"boostrecsdev", env.AzureConnection}
-	return azure.EnqueueMessage("dispatch-main", "searchspring.boost.pauseRequested", trackingCode)
+	azure := NewAzureStorage()
+	cloudEvent := NewCloudEvent("searchspring.boost.pauseRequested", trackingCode, nil)
+	return azure.EnqueueMessage("testing", cloudEvent)
 }
 
 func getHungSites() []Site {

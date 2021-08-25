@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
-	"github.com/searchspring/nebo/models"
+	"github.com/kelseyhightower/envconfig"
+	"github.com/searchspring/nebo/common"
 	"log"
 	"net/url"
 	"time"
@@ -19,7 +20,18 @@ type AzureStorage struct {
 	ConnectionString string
 }
 
-func (storage *AzureStorage) EnqueueMessage(queue string, action string, subject string) (string, error) {
+// NewAzureStorage AzureStorage constructor that references ENV variables
+func NewAzureStorage() AzureStorage {
+	var env common.EnvVars
+	envconfig.Process("", &env)
+
+	return AzureStorage{
+		AccountName:      "boostrecsdev",
+		ConnectionString: env.AzureConnection,
+	}
+}
+
+func (storage *AzureStorage) EnqueueMessage(queue string, cloudEvent CloudEvent) (string, error) {
 	credentials, err := azqueue.NewSharedKeyCredential(storage.AccountName, storage.ConnectionString)
 
 	if err != nil {
@@ -37,17 +49,11 @@ func (storage *AzureStorage) EnqueueMessage(queue string, action string, subject
 	ctx := context.TODO() // This example uses a never-expiring context.
 
 	messagesURL := mainDispatchQueue.NewMessagesURL()
-	payload := models.AzureQueueMessage{
-		Source:      "/nebo",
-		Type:        action,
-		Subject:     subject,
-		Data:        nil,
-	}
 
-	b, _ := json.Marshal(payload)
-	_, err = messagesURL.Enqueue(ctx, string(b), time.Second*0, time.Minute)
+	b, _ := json.Marshal(cloudEvent)
+
 	var val string
-	if err == nil {
+	if _, err = messagesURL.Enqueue(ctx, string(b), time.Second*0, time.Minute); err == nil {
 		val = "Success!"
 	} else {
 		val = "Failed"

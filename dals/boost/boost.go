@@ -3,7 +3,10 @@ package boost
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kelseyhightower/envconfig"
+	"github.com/searchspring/nebo/common"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -11,6 +14,10 @@ import (
 // Site BoostAdminApi response from /sites?status=hung
 type Site struct {
 	Status, Message, SiteId, Name string
+}
+
+type UpdateResponse struct {
+	Status string `json:"status"`
 }
 
 const boostAdminUrl = "https://boostadmin.azurewebsites.net"
@@ -33,14 +40,14 @@ func HandleStatusRequest(trackingCode string) map[string]interface{} {
 	url := boostAdminUrl + "/sites/" + trackingCode + "/status"
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("Error getting status for " + trackingCode)
+		log.Println("Error getting status for " + trackingCode)
 	}
 	defer resp.Body.Close()
 	body, err2 := io.ReadAll(resp.Body)
 	var status = make(map[string]interface{})
 
 	if err2 != nil {
-		fmt.Println("Error parsing get status response")
+		log.Println("Error parsing get status response")
 	} else {
 		json.Unmarshal(body, &status)
 	}
@@ -51,14 +58,14 @@ func HandleGetExclusionStatsRequest(trackingCode string) map[string]interface{} 
 	url := boostAdminUrl + "/sites/" + trackingCode + "/exclusionStats"
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("Error getting exclusionStats for " + trackingCode)
+		log.Println("Error getting exclusionStats for " + trackingCode)
 	}
 	defer resp.Body.Close()
 	body, err2 := io.ReadAll(resp.Body)
 	var stats = make(map[string]interface{})
 
 	if err2 != nil {
-		fmt.Println("Error parsing exclusion stats response")
+		log.Println("Error parsing exclusion stats response")
 	} else {
 		json.Unmarshal(body, &stats)
 	}
@@ -66,25 +73,34 @@ func HandleGetExclusionStatsRequest(trackingCode string) map[string]interface{} 
 }
 
 func RestartSite(trackingCode string) {
-	url := boostAdminUrl + "/sites/" + trackingCode + "/restart"
+	url := fmt.Sprintf("%v/sites/%v/restart", boostAdminUrl, trackingCode)
 	_, err := http.Post(url, "application/json", nil)
 	if err != nil {
-		fmt.Println("Error restarting " + trackingCode)
+		log.Println("Error restarting " + trackingCode)
 	}
-	fmt.Println("Restarted " + trackingCode)
+	log.Println("Restarted " + trackingCode)
+}
+
+
+func HandlePauseRequest(trackingCode string) (string, error) {
+	var env common.EnvVars
+	envconfig.Process("", &env)
+
+	azure := AzureStorage{"boostrecsdev", env.AzureConnection}
+	return azure.EnqueueMessage("dispatch-main", "searchspring.boost.pauseRequested", trackingCode)
 }
 
 func getHungSites() []Site {
 	resp, err := http.Get(boostAdminUrl + "/sites?status=hung")
 	if err != nil {
-		fmt.Println("Error getting list of hung sites")
+		log.Println("Error getting list of hung sites")
 	}
 
 	defer resp.Body.Close()
 	body, err2 := io.ReadAll(resp.Body)
 
 	if err2 != nil {
-		fmt.Println("Error parsing list of sites")
+		log.Println("Error parsing list of sites")
 	} else {
 		var sites []Site
 		json.Unmarshal(body, &sites)

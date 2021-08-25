@@ -272,20 +272,28 @@ func handleBoostActions(rawUserInput string) []byte {
 
 	switch len(args) {
 	case 2:
-		command := args[0]
-		if command == boost.SlackCommands[boost.Status] {
-			status := boost.HandleStatusRequest(args[1])
-			msg.Text = FormatMapResponse(status)
-		}
-		if command == boost.SlackCommands[boost.Restart] {
-			boost.RestartSite(args[1])
-
-			status := boost.HandleStatusRequest(args[1])
-			msg.Text = FormatMapResponse(status)
-		}
-		if command == boost.SlackCommands[boost.Exclusions] {
-			stats := boost.HandleGetExclusionStatsRequest(args[1])
-			msg.Text = FormatMapResponse(stats)
+		switch args[0] {
+		case boost.SlackCommands[boost.Status]:
+			{
+				status := boost.HandleStatusRequest(args[1])
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.Restart]:
+			{
+				boost.RestartSite(args[1])
+				status := boost.HandleStatusRequest(args[1])
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.Exclusions]:
+			{
+				stats := boost.HandleGetExclusionStatsRequest(args[1])
+				msg.Text = FormatMapResponse(stats)
+			}
+		case boost.SlackCommands[boost.Pause]:
+			{
+				resp, _ := boost.HandlePauseRequest(args[1])
+				msg.Text = resp
+			}
 		}
 	default:
 		msg.ResponseType = slack.ResponseTypeEphemeral

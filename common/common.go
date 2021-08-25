@@ -27,6 +27,7 @@ type EnvVars struct {
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
 	MetabaseUser           string `split_words:"true" required:"false"`
 	MetabasePassword       string `split_words:"true" required:"false"`
+	AzureConnection        string `split_words:"true" required:"false"`
 }
 
 // Platforms is a list of platforms in salesforce
@@ -106,7 +107,7 @@ type Client struct {
 	cache      map[string][]byte
 }
 
-// Create a new Client
+// NewClient Create a new Client
 func NewClient(client HTTPClient) *Client {
 	return &Client{
 		httpClient: client,
@@ -158,7 +159,7 @@ func (c *Client) AuthorizedGetWithCache(token string, url string, useCache bool)
 
 // formats AccountInfo into Slack Message
 
-// example formatting here: https://api.slack.com/reference/messaging/attachments
+// FormatAccountInfos example formatting here: https://api.slack.com/reference/messaging/attachments
 func FormatAccountInfos(accountInfos []*models.AccountInfo, search string) *slack.Msg {
 	initialText := "Reps for search: " + search
 	if len(accountInfos) == 0 {

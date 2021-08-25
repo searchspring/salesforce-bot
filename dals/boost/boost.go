@@ -3,6 +3,7 @@ package boost
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/searchspring/nebo/common"
 	"io"
 	"log"
 	"net/http"
@@ -18,8 +19,6 @@ type UpdateResponse struct {
 	Status string `json:"status"`
 }
 
-const boostAdminUrl = "https://boostadmin.azurewebsites.net"
-
 func RestartHungSites() {
 	restartSites(getHungSites())
 }
@@ -34,40 +33,26 @@ func restartSites(sites []Site) {
 	}
 }
 
-func HandleStatusRequest(trackingCode string) map[string]interface{} {
-	url := boostAdminUrl + "/sites/" + trackingCode + "/status"
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Println("Error getting status for " + trackingCode)
-	}
-	defer resp.Body.Close()
-	body, err2 := io.ReadAll(resp.Body)
-	var status = make(map[string]interface{})
-
-	if err2 != nil {
-		log.Println("Error parsing get status response")
-	} else {
-		json.Unmarshal(body, &status)
-	}
-	return status
+func HandleGetStatusRequest(trackingCode string, client *common.Client) map[string]interface{} {
+	url := fmt.Sprintf("%v/sites/%v/status", boostAdminUrl, trackingCode)
+	return GenericJsonRequest(client, url)
 }
 
-func HandleGetExclusionStatsRequest(trackingCode string) map[string]interface{} {
-	url := boostAdminUrl + "/sites/" + trackingCode + "/exclusionStats"
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Println("Error getting exclusionStats for " + trackingCode)
-	}
-	defer resp.Body.Close()
-	body, err2 := io.ReadAll(resp.Body)
-	var stats = make(map[string]interface{})
+func HandleGetExclusionStatsRequest(trackingCode string, client *common.Client) map[string]interface{} {
+	url := fmt.Sprintf("%v/sites/%v/exclusionStats", boostAdminUrl, trackingCode)
+	return GenericJsonRequest(client, url)
+}
 
-	if err2 != nil {
-		log.Println("Error parsing exclusion stats response")
+// GenericJsonRequest Make a request to a URL and return the *flat* list of JSON back to the caller as a map
+func GenericJsonRequest(client *common.Client, url string) map[string]interface{} {
+	var values = make(map[string]interface{})
+
+	if bytes, err := client.Get(url); err == nil {
+		json.Unmarshal(bytes, &values)
 	} else {
-		json.Unmarshal(body, &stats)
+		log.Println("Error parsing response from " + url)
 	}
-	return stats
+	return values
 }
 
 func RestartSite(trackingCode string) {

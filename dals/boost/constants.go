@@ -21,3 +21,5 @@ var SlackOptions = []string{
 	"`/boost " + SlackCommands[Exclusions] + " <siteId>` - list exclusion stats for a site",
 	"`/boost " + SlackCommands[Pause] + " <siteId>` - pause updates for a site",
 }
+
+const boostAdminUrl = "https://boostadmin.azurewebsites.net"

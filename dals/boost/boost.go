@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/searchspring/nebo/common"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -17,20 +16,6 @@ type Site struct {
 
 type UpdateResponse struct {
 	Status string `json:"status"`
-}
-
-func RestartHungSites() {
-	restartSites(getHungSites())
-}
-
-func restartSites(sites []Site) {
-	if sites != nil {
-		for _, site := range sites {
-			if len(site.SiteId) == 6 {
-				RestartSite(site.SiteId)
-			}
-		}
-	}
 }
 
 func HandleGetStatusRequest(trackingCode string, client *common.Client) map[string]interface{} {
@@ -57,36 +42,13 @@ func GenericJsonRequest(client *common.Client, url string) map[string]interface{
 
 func RestartSite(trackingCode string) {
 	url := fmt.Sprintf("%v/sites/%v/restart", boostAdminUrl, trackingCode)
-	_, err := http.Post(url, "application/json", nil)
-	if err != nil {
-		log.Println("Error restarting " + trackingCode)
-	}
-	log.Println("Restarted " + trackingCode)
+	http.Post(url, "application/json", nil)
 }
 
 func HandlePauseRequest(trackingCode string) (string, error) {
 	azure := NewAzureStorage()
 	cloudEvent := NewCloudEvent("searchspring.boost.pauseRequested", trackingCode, nil)
-	return azure.EnqueueMessage("testing", cloudEvent)
-}
-
-func getHungSites() []Site {
-	resp, err := http.Get(boostAdminUrl + "/sites?status=hung")
-	if err != nil {
-		log.Println("Error getting list of hung sites")
-	}
-
-	defer resp.Body.Close()
-	body, err2 := io.ReadAll(resp.Body)
-
-	if err2 != nil {
-		log.Println("Error parsing list of sites")
-	} else {
-		var sites []Site
-		json.Unmarshal(body, &sites)
-		return sites
-	}
-	return nil
+	return azure.EnqueueMessage("admin", cloudEvent)
 }
 
 func HelpText() string {

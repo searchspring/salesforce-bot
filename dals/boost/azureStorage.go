@@ -2,6 +2,7 @@ package boost
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/Azure/azure-storage-queue-go/azqueue"
@@ -50,10 +51,11 @@ func (storage *AzureStorage) EnqueueMessage(queue string, cloudEvent CloudEvent)
 
 	messagesURL := mainDispatchQueue.NewMessagesURL()
 
-	b, _ := json.Marshal(cloudEvent)
+	bytes, _ := json.Marshal(cloudEvent)
+	encodedStr := base64.StdEncoding.EncodeToString(bytes)
 
 	var val string
-	if _, err = messagesURL.Enqueue(ctx, string(b), time.Second*0, time.Minute); err == nil {
+	if _, err = messagesURL.Enqueue(ctx, encodedStr, time.Second*0, time.Minute); err == nil {
 		val = "Success!"
 	} else {
 		val = "Failed"

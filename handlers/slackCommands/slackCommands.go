@@ -281,6 +281,8 @@ func handleBoostActions(rawUserInput string) []byte {
 		case boost.SlackCommands[boost.Restart]:
 			{
 				boost.RestartSite(args[1])
+
+				// return the current status to the user
 				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
 				msg.Text = FormatMapResponse(status)
 			}

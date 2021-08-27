@@ -21,7 +21,6 @@ import (
 	"github.com/searchspring/nebo/dals/metabase"
 	"github.com/searchspring/nebo/dals/nextopia"
 	"github.com/searchspring/nebo/dals/salesforce"
-
 )
 
 var salesForceDAO salesforce.DAO = nil
@@ -67,11 +66,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	aggregation := aggregate.AggregateServiceImpl{
 		Deps: &aggregate.Deps{
-			MetabaseDAO: metabaseDAO,
+			MetabaseDAO:   metabaseDAO,
 			SalesforceDAO: salesForceDAO,
 		},
 	}
-
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
@@ -91,7 +89,22 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write(responseJSON)
 		return
-
+	case "/partner":
+		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
+			writeHelpPartner(w)
+			return
+		}
+		if salesForceDAO == nil {
+			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
+			return
+		}
+		responseJSON, err := aggregation.QueryPartners(s.Text)
+		if err != nil {
+			common.SendInternalServerError(w, err)
+			return
+		}
+		w.Write(responseJSON)
+		return
 	case "/fire", "/firetest":
 		if strings.TrimSpace(s.Text) == "help" {
 			writeHelpFire(w)
@@ -172,6 +185,15 @@ func writeHelpFire(w http.ResponseWriter) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
 		Text:         "Fire usage:\n`/fire` - generate a fire checklist to handle the fire",
+	}
+	json, _ := json.Marshal(msg)
+	w.Write(json)
+}
+
+func writeHelpPartner(w http.ResponseWriter) {
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeEphemeral,
+		Text:         "Partner usage:\n`/parnter` - gets a Salesforce partner account",
 	}
 	json, _ := json.Marshal(msg)
 	w.Write(json)

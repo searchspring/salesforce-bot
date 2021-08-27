@@ -14,3 +14,14 @@ type AccountInfo struct {
 	City        string
 	State       string
 }
+
+type PartnerInfo struct {
+	Name               string
+	Type               string
+	Status             string
+	OwnerID            string
+	PartnerType        string
+	SupportedPlatforms string
+	PartnerTerms       string
+	PartnerTermsNotes  string
+}

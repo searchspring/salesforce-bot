@@ -13,7 +13,9 @@ import (
 // DAO acts as the salesforce DAO
 type DAO interface {
 	Query(query string) ([]*models.AccountInfo, error)
+	QueryPartners(query string) ([]*models.PartnerInfo, error)
 	ResultToMessage(query string, result *simpleforce.QueryResult) ([]*models.AccountInfo, error)
+	ResultToPartnerMessage(search string, result *simpleforce.QueryResult) ([]*models.PartnerInfo, error)
 	GetSearchKey() string
 }
 
@@ -45,13 +47,10 @@ func NewDAO(sfURL string, sfUser string, sfPassword string, sfToken string) DAO 
 }
 
 func (s *DAOImpl) Query(search string) ([]*models.AccountInfo, error) {
-	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
+	sanitized, err := sanitize(search)
 	if err != nil {
 		return nil, err
 	}
-
-	sanitized := reg.ReplaceAllString(search, "")
-
 	q := "SELECT " + selectFields + " " +
 		"FROM Account WHERE (Website LIKE '%" + sanitized + "%' OR Platform__c LIKE '%" + sanitized +
 		"%' OR Tracking_Code__c = '" + sanitized + "') ORDER BY Chargify_MRR__c DESC"
@@ -60,6 +59,54 @@ func (s *DAOImpl) Query(search string) ([]*models.AccountInfo, error) {
 		return nil, err
 	}
 	return s.ResultToMessage(sanitized, result)
+}
+
+func sanitize(search string) (sanitizedSearch string, err error) {
+	reg, err := regexp.Compile("[^a-zA-Z0-9_.-]+")
+	if err != nil {
+		return sanitizedSearch, err
+	}
+	return reg.ReplaceAllString(search, ""), nil
+}
+
+func (s *DAOImpl) QueryPartners(search string) ([]*models.PartnerInfo, error) {
+	sanitized, err := sanitize(search)
+	if err != nil {
+		return nil, err
+	}
+	q := "SELECT Name, Type, Account_Status__c, OwnerId, Partner_Type__c, Supported_Platforms__c, Partner_Terms__c, Partner_Terms_Notes__c " +
+		"FROM Account WHERE (Type = 'Partner' OR Type = 'Potential Partner') AND Name LIKE '%" + sanitized + "%' " +
+		"ORDER BY Name LIMIT 5"
+	result, err := s.Client.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	return s.ResultToPartnerMessage(sanitized, result)
+}
+
+func getField(field interface{}) (result string) {
+	result = "unknown"
+	if field != nil {
+		result = fmt.Sprintf("%s", field)
+	}
+	return result
+}
+
+func (s *DAOImpl) ResultToPartnerMessage(search string, result *simpleforce.QueryResult) ([]*models.PartnerInfo, error) {
+	partners := []*models.PartnerInfo{}
+	for _, record := range result.Records {
+		partners = append(partners, &models.PartnerInfo{
+			Name:               getField(record["Name"]),
+			Type:               getField(record["Type"]),
+			Status:             getField(record["Account_Status__c"]),
+			OwnerID:            getField(record["OwnerId"]),
+			PartnerType:        getField(record["Partner_Type__c"]),
+			SupportedPlatforms: getField(record["Supported_Platforms__c"]),
+			PartnerTerms:       getField(record["Partner_Terms__c"]),
+			PartnerTermsNotes:  getField(record["Partner_Terms_Notes__c"]),
+		})
+	}
+	return partners, nil
 }
 
 func (s *DAOImpl) ResultToMessage(search string, result *simpleforce.QueryResult) ([]*models.AccountInfo, error) {

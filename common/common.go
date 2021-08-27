@@ -204,3 +204,40 @@ func FormatAccountInfos(accountInfos []*models.AccountInfo, search string) *slac
 	}
 	return msg
 }
+
+func FormatPartnerInfos(partnerInfos []*models.PartnerInfo, search string) *slack.Msg {
+	initialText := "Partners for search: " + search
+	if len(partnerInfos) == 0 {
+		initialText = "No results for: " + search
+	}
+
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeInChannel,
+		Text:         initialText,
+		Attachments:  []slack.Attachment{},
+	}
+
+	for _, partner := range partnerInfos {
+
+		terms := "\nPartner Terms: "
+		if partner.PartnerTerms == "unknown" && partner.PartnerTermsNotes == "unknown" {
+			terms = ""
+		} else {
+			if partner.PartnerTerms != "unknown" {
+				terms = terms + partner.PartnerTerms + " "
+			}
+			if partner.PartnerTermsNotes != "unknown" {
+				terms = terms + partner.PartnerTermsNotes
+			}
+		}
+
+		text := "Name: " + partner.Name + "\nType: " + partner.Type + "\nStatus: " + partner.Status +
+			"\nOwnerID: " + partner.OwnerID + "\nPartner Type: " + partner.Type + "\nSupported Platforms: " + partner.SupportedPlatforms + terms
+		msg.Attachments = append(msg.Attachments, slack.Attachment{
+			Color:      "#3A23AD",
+			Text:       text,
+			AuthorName: partner.Name + " (" + partner.Type + ")",
+		})
+	}
+	return msg
+}

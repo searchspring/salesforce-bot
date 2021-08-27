@@ -48,6 +48,15 @@ func (d *AggregateServiceImpl) Query(search string) ([]byte, error) {
 	return json.Marshal(msg)
 }
 
+func (d *AggregateServiceImpl) QueryPartners(search string) ([]byte, error) {
+	salesforceData, err := d.Deps.SalesforceDAO.QueryPartners(search)
+	if err != nil {
+		return nil, nil
+	}
+	msg := common.FormatPartnerInfos(salesforceData, search)
+	return json.Marshal(msg)
+}
+
 // helper functions
 
 func addMetabaseAccounts(metabaseData []*models.AccountInfo, salesforceData []*models.AccountInfo) []*models.AccountInfo {
@@ -67,7 +76,7 @@ func addMetabaseAccounts(metabaseData []*models.AccountInfo, salesforceData []*m
 
 func addSalesforceAccounts(currentCustomerData []*models.AccountInfo, salesforceData []*models.AccountInfo) []*models.AccountInfo {
 	for _, v := range salesforceData {
-		e, _ := exists(v.SiteId, v.Website, currentCustomerData) 
+		e, _ := exists(v.SiteId, v.Website, currentCustomerData)
 		if !e {
 			if v.Type == "Customer" || v.Type == "Inactive Customer" {
 				currentCustomerData = append(currentCustomerData, v)

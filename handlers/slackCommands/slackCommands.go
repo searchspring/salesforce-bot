@@ -291,17 +291,17 @@ func handleBoostActions(rawUserInput string) []byte {
 				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
 				msg.Text = FormatMapResponse(status)
 			}
-		case boost.SlackCommands[boost.Pause]:
+		case boost.SlackCommands[boost.PauseUpdates]:
 			{
-				boost.HandlePauseRequest(args[1])
+				boost.HandlePauseUpdates(args[1])
 
 				// return the current status to the end user
 				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
 				msg.Text = FormatMapResponse(status)
 			}
-		case boost.SlackCommands[boost.Restart]:
+		case boost.SlackCommands[boost.ResumeUpdates]:
 			{
-				boost.HandleRestartRequest(args[1])
+				boost.HandleResumeUpdates(args[1])
 
 				// return the current status to the end user
 				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))

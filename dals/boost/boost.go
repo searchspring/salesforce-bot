@@ -45,15 +45,15 @@ func HandleUpdateRequest(trackingCode string) (string, error) {
 	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
 }
 
-func HandlePauseRequest(trackingCode string) (string, error) {
+func HandlePauseUpdates(trackingCode string) (string, error) {
 	azure := NewAzureStorage()
-	cloudEvent := NewCloudEvent("searchspring.boost.pauseRequested", trackingCode, nil)
+	cloudEvent := NewCloudEvent("searchspring.boost.pauseUpdatesRequested", trackingCode, nil)
 	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
 }
 
-func HandleRestartRequest(trackingCode string) (string, error) {
+func HandleResumeUpdates(trackingCode string) (string, error) {
 	azure := NewAzureStorage()
-	cloudEvent := NewCloudEvent("searchspring.boost.restartRequested", trackingCode, nil)
+	cloudEvent := NewCloudEvent("searchspring.boost.resumeUpdatesRequested", trackingCode, nil)
 	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
 }
 

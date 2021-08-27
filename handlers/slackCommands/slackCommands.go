@@ -98,7 +98,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			common.SendInternalServerError(w, errors.New("missing required Salesforce credentials"))
 			return
 		}
-		responseJSON, err := aggregation.QueryPartners(s.Text)
+		text := strings.ReplaceAll(strings.TrimSpace(s.Text), " ", "_")
+		responseJSON, err := aggregation.QueryPartners(text)
 		if err != nil {
 			common.SendInternalServerError(w, err)
 			return

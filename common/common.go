@@ -27,6 +27,7 @@ type EnvVars struct {
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
 	MetabaseUser           string `split_words:"true" required:"false"`
 	MetabasePassword       string `split_words:"true" required:"false"`
+	AzureAccount           string `split_words:"true" required:"false"`
 	AzureConnection        string `split_words:"true" required:"false"`
 }
 

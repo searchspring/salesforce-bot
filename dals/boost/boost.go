@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/searchspring/nebo/common"
 	"log"
-	"net/http"
 	"strings"
 )
 
@@ -20,16 +19,16 @@ type UpdateResponse struct {
 
 func HandleGetStatusRequest(trackingCode string, client *common.Client) map[string]interface{} {
 	url := fmt.Sprintf("%v/sites/%v/status", boostAdminUrl, trackingCode)
-	return GenericJsonRequest(client, url)
+	return genericJsonRequest(client, url)
 }
 
 func HandleGetExclusionStatsRequest(trackingCode string, client *common.Client) map[string]interface{} {
 	url := fmt.Sprintf("%v/sites/%v/exclusionStats", boostAdminUrl, trackingCode)
-	return GenericJsonRequest(client, url)
+	return genericJsonRequest(client, url)
 }
 
 // GenericJsonRequest Make a request to a URL and return the *flat* list of JSON back to the caller as a map
-func GenericJsonRequest(client *common.Client, url string) map[string]interface{} {
+func genericJsonRequest(client *common.Client, url string) map[string]interface{} {
 	var values = make(map[string]interface{})
 
 	if bytes, err := client.Get(url); err == nil {
@@ -40,15 +39,28 @@ func GenericJsonRequest(client *common.Client, url string) map[string]interface{
 	return values
 }
 
-func RestartSite(trackingCode string) {
-	url := fmt.Sprintf("%v/sites/%v/restart", boostAdminUrl, trackingCode)
-	http.Post(url, "application/json", nil)
+func HandleUpdateRequest(trackingCode string) (string, error) {
+	azure := NewAzureStorage()
+	cloudEvent := NewCloudEvent("searchspring.boost.updateRequested", trackingCode, nil)
+	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
 }
 
 func HandlePauseRequest(trackingCode string) (string, error) {
 	azure := NewAzureStorage()
 	cloudEvent := NewCloudEvent("searchspring.boost.pauseRequested", trackingCode, nil)
-	return azure.EnqueueMessage("admin", cloudEvent)
+	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
+}
+
+func HandleRestartRequest(trackingCode string) (string, error) {
+	azure := NewAzureStorage()
+	cloudEvent := NewCloudEvent("searchspring.boost.restartRequested", trackingCode, nil)
+	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
+}
+
+func HandleCancelRequest(trackingCode string) (string, error) {
+	azure := NewAzureStorage()
+	cloudEvent := NewCloudEvent("searchspring.boost.cancelRequested", trackingCode, nil)
+	return azure.EnqueueMessage(mainBoostDispatchQueue, cloudEvent)
 }
 
 func HelpText() string {

@@ -272,17 +272,9 @@ func handleBoostActions(rawUserInput string) []byte {
 
 	switch len(args) {
 	case 2:
-		switch args[0] {
+		switch strings.ToLower(args[0]) {
 		case boost.SlackCommands[boost.Status]:
 			{
-				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
-				msg.Text = FormatMapResponse(status)
-			}
-		case boost.SlackCommands[boost.Restart]:
-			{
-				boost.RestartSite(args[1])
-
-				// return the current status to the user
 				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
 				msg.Text = FormatMapResponse(status)
 			}
@@ -291,10 +283,37 @@ func handleBoostActions(rawUserInput string) []byte {
 				stats := boost.HandleGetExclusionStatsRequest(args[1], common.NewClient(&http.Client{}))
 				msg.Text = FormatMapResponse(stats)
 			}
+		case boost.SlackCommands[boost.Update]:
+			{
+				boost.HandleUpdateRequest(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
 		case boost.SlackCommands[boost.Pause]:
 			{
-				resp, _ := boost.HandlePauseRequest(args[1])
-				msg.Text = resp
+				boost.HandlePauseRequest(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.Restart]:
+			{
+				boost.HandleRestartRequest(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.Cancel]:
+			{
+				boost.HandleCancelRequest(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
 			}
 		default:
 			msg.ResponseType = slack.ResponseTypeEphemeral

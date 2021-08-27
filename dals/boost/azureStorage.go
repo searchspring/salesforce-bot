@@ -27,7 +27,7 @@ func NewAzureStorage() AzureStorage {
 	envconfig.Process("", &env)
 
 	return AzureStorage{
-		AccountName:      "boostrecsdev",
+		AccountName:      env.AzureAccount,
 		ConnectionString: env.AzureConnection,
 	}
 }
@@ -39,7 +39,6 @@ func (storage *AzureStorage) EnqueueMessage(queue string, cloudEvent CloudEvent)
 		log.Println("Failed to authenticate")
 		return fmt.Sprintf("Failed to authenticate to Azure resource: `%v`", storage.AccountName), err
 	}
-	log.Println("Authenticated to Azure..")
 
 	pipeline := azqueue.NewPipeline(credentials, azqueue.PipelineOptions{})
 

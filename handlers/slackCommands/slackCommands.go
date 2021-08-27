@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/searchspring/nebo/dals/boost"
 	"log"
 	"math/rand"
 	"net/http"
@@ -21,7 +22,6 @@ import (
 	"github.com/searchspring/nebo/dals/metabase"
 	"github.com/searchspring/nebo/dals/nextopia"
 	"github.com/searchspring/nebo/dals/salesforce"
-
 )
 
 var salesForceDAO salesforce.DAO = nil
@@ -67,11 +67,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	aggregation := aggregate.AggregateServiceImpl{
 		Deps: &aggregate.Deps{
-			MetabaseDAO: metabaseDAO,
+			MetabaseDAO:   metabaseDAO,
 			SalesforceDAO: salesForceDAO,
 		},
 	}
-
 
 	w.Header().Set("Content-type", "application/json")
 	switch s.Command {
@@ -94,7 +93,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	case "/fire", "/firetest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpFire(w)
+			writeHelpText(w, "Fire usage:\n`/fire` - generate a fire checklist to handle the fire")
 			return
 		}
 		fireResponse(env.GdriveFireDocFolderID, s.ResponseURL)
@@ -144,18 +143,21 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.Write(byteRes)
 		return
 
-	case "/meet":
-		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpMeet(w)
+	case "/boost", "/boosttest":
+		if strings.TrimSpace(s.Text) == "help" || strings.TrimSpace(s.Text) == "" {
+			writeHelpText(w, boost.HelpText())
 			return
 		}
-		responseJSON := meetResponse(s.Text)
-		w.Write(responseJSON)
+
+		w.Write(handleBoostActions(s.Text))
 		return
 
-	case "/meettest":
+	case "/meet", "/meettest":
 		if strings.TrimSpace(s.Text) == "help" {
-			writeHelpMeet(w)
+			writeHelpText(w, "Meet usage:\n"+
+				"`/meet` - generate a random meet\n"+
+				"`/meet name` - generate a meet with a name\n"+
+				"`/meet help` - this message")
 			return
 		}
 		responseJSON := meetResponse(s.Text)
@@ -166,15 +168,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		common.SendInternalServerError(w, errors.New("unknown slash command "+s.Command))
 		return
 	}
-}
-
-func writeHelpFire(w http.ResponseWriter) {
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Fire usage:\n`/fire` - generate a fire checklist to handle the fire",
-	}
-	json, _ := json.Marshal(msg)
-	w.Write(json)
 }
 
 func writeHelpNebo(w http.ResponseWriter) {
@@ -195,18 +188,16 @@ func writeHelpNebo(w http.ResponseWriter) {
 	w.Write(json)
 }
 func writeHelpNeboid(w http.ResponseWriter) {
-	msg := &slack.Msg{
-		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Neboid usage:\n`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n`/neboid help` - this message",
-	}
-	json, _ := json.Marshal(msg)
-	w.Write(json)
+	writeHelpText(w, "Neboid usage:\n"+
+		"`/neboid <id prefix>` - find all customers with an id that starts with this prefix\n"+
+		"`/neboid help` - this message")
 }
 
-func writeHelpMeet(w http.ResponseWriter) {
+// Simple wrapper that sends help text to only the Slack user who requested it
+func writeHelpText(w http.ResponseWriter, helpText string) {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeEphemeral,
-		Text:         "Meet usage:\n`/meet` - generate a random meet\n`/meet name` - generate a meet with a name\n`/meet help` - this message",
+		Text:         helpText,
 	}
 	json, _ := json.Marshal(msg)
 	w.Write(json)
@@ -215,13 +206,13 @@ func writeHelpMeet(w http.ResponseWriter) {
 func meetResponse(search string) []byte {
 	msg := &slack.Msg{
 		ResponseType: slack.ResponseTypeInChannel,
-		Text:         getMeetLink(search),
+		Text:         GetMeetLink(search),
 	}
 	json, _ := json.Marshal(msg)
 	return json
 }
 
-func getMeetLink(search string) string {
+func GetMeetLink(search string) string {
 	name := search
 	name = strings.ReplaceAll(name, " ", "-")
 	if strings.TrimSpace(search) == "" {
@@ -256,7 +247,7 @@ func fireChecklist(folderID string) string {
 		"4. Post link to the fire doc\n" +
 		"5. If a real fire - announcer posts to the <#C024FV14Z> channel \"There is a fire and engineering is investigating, updates will be posted in a thread on this message\"\n" +
 		"6. Post a link to the fire document in the <#C024FV14Z> channel thread\n" +
-		"7. Fight! " + getMeetLink("fire-investigation-"+timestamp(time.Now())) + "\n\n\n" +
+		"7. Fight! " + GetMeetLink("fire-investigation-"+timestamp(time.Now())) + "\n\n\n" +
 		"8. Use `/firedown` when the fire is out\n"
 	return text
 }
@@ -270,6 +261,81 @@ func fireDownResponse() []byte {
 	}
 	json, _ := json.Marshal(msg)
 	return json
+}
+
+func handleBoostActions(rawUserInput string) []byte {
+	msg := &slack.Msg{
+		ResponseType: slack.ResponseTypeInChannel,
+	}
+
+	args := strings.Split(rawUserInput, " ")
+
+	switch len(args) {
+	case 2:
+		switch strings.ToLower(args[0]) {
+		case boost.SlackCommands[boost.Status]:
+			{
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.Exclusions]:
+			{
+				stats := boost.HandleGetExclusionStatsRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(stats)
+			}
+		case boost.SlackCommands[boost.Update]:
+			{
+				boost.HandleUpdateRequest(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.PauseUpdates]:
+			{
+				boost.HandlePauseUpdates(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.ResumeUpdates]:
+			{
+				boost.HandleResumeUpdates(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		case boost.SlackCommands[boost.Cancel]:
+			{
+				boost.HandleCancelRequest(args[1])
+
+				// return the current status to the end user
+				status := boost.HandleGetStatusRequest(args[1], common.NewClient(&http.Client{}))
+				msg.Text = FormatMapResponse(status)
+			}
+		default:
+			msg.ResponseType = slack.ResponseTypeEphemeral
+			msg.Text = boost.HelpText()
+		}
+	default:
+		msg.ResponseType = slack.ResponseTypeEphemeral
+		msg.Text = boost.HelpText()
+	}
+	jsonResponse, _ := json.Marshal(msg)
+	return jsonResponse
+}
+
+// FormatMapResponse Return each key/value pair on a new line, together formatted as a block
+func FormatMapResponse(obj map[string]interface{}) (text string) {
+	text += "```"
+	for key, val := range obj {
+		stringVal := fmt.Sprintf("%v", val)
+		text += key + ": " + stringVal + "\n"
+	}
+	text += "```"
+	return
 }
 
 func timestamp(currentTime time.Time) string {

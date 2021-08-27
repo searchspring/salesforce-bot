@@ -27,6 +27,8 @@ type EnvVars struct {
 	GdriveFireDocFolderID  string `split_words:"true" required:"false"`
 	MetabaseUser           string `split_words:"true" required:"false"`
 	MetabasePassword       string `split_words:"true" required:"false"`
+	AzureAccount           string `split_words:"true" required:"false"`
+	AzureConnection        string `split_words:"true" required:"false"`
 }
 
 // Platforms is a list of platforms in salesforce
@@ -106,7 +108,7 @@ type Client struct {
 	cache      map[string][]byte
 }
 
-// Create a new Client
+// NewClient Create a new Client with cache
 func NewClient(client HTTPClient) *Client {
 	return &Client{
 		httpClient: client,
@@ -126,7 +128,6 @@ func (c *Client) AuthorizedGetNoCache(token string, url string) ([]byte, error) 
 
 // AuthorizedGetWithCache make a secure request out to the googs and possibly use a cache.
 func (c *Client) AuthorizedGetWithCache(token string, url string, useCache bool) ([]byte, error) {
-
 	if body, ok := c.cache[url]; ok && useCache {
 		return body, nil
 	}
@@ -156,9 +157,29 @@ func (c *Client) AuthorizedGetWithCache(token string, url string, useCache bool)
 	return body, nil
 }
 
-// formats AccountInfo into Slack Message
+func (c *Client) Get(url string) ([]byte, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	response, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed connecting to %s with error %s", url, err.Error())
+	}
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed read response: %s", err.Error())
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		log.Println("error from server", string(body))
+		return nil, fmt.Errorf("failed to reading from URL - status code: %d - error: %s", response.StatusCode, string(body))
+	}
+	return body, nil
+}
 
-// example formatting here: https://api.slack.com/reference/messaging/attachments
+// FormatAccountInfos formats AccountInfo into Slack Message
+// FormatAccountInfos example formatting here: https://api.slack.com/reference/messaging/attachments
 func FormatAccountInfos(accountInfos []*models.AccountInfo, search string) *slack.Msg {
 	initialText := "Reps for search: " + search
 	if len(accountInfos) == 0 {

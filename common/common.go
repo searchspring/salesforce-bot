@@ -231,8 +231,7 @@ func FormatPartnerInfos(partnerInfos []*models.PartnerInfo, search string) *slac
 			}
 		}
 
-		text := "Name: " + partner.Name + "\nType: " + partner.Type + "\nStatus: " + partner.Status +
-			"\nOwnerID: " + partner.OwnerID + "\nPartner Type: " + partner.Type + "\nSupported Platforms: " + partner.SupportedPlatforms + terms
+		text := "\nStatus: " + partner.Status + "\nOwnerID: " + partner.OwnerID + "\nType: " + partner.PartnerType + "\nSupported Platforms: " + partner.SupportedPlatforms + terms
 		msg.Attachments = append(msg.Attachments, slack.Attachment{
 			Color:      "#3A23AD",
 			Text:       text,
